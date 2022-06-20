@@ -129,6 +129,7 @@ fn load_bril_instr(instr_v: &JsonValue) -> Result<Rc<Instruction>, BrilLoadError
         "const" => load_bril_const_instr(op_str, instr_v),
         "print" => load_bril_effect_instr(op_str, instr_v),
         "jmp" => load_bril_effect_instr(op_str, instr_v),
+        "ret" => load_bril_effect_instr(op_str, instr_v),
         _ => Err(BrilLoadError::UnrecognizedInstr(op_str.to_string())),
     }
 }

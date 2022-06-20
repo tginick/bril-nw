@@ -49,13 +49,15 @@ pub fn load_function_blocks(function: Rc<Function>) -> Vec<BasicBlock> {
                 cur_block_instrs.clear();
             }
         } else if instr.is_label() {
-            blocks.push(BasicBlock {
-                id: cur_id,
-                instrs: cur_block_instrs.clone(),
-            });
+            if !cur_block_instrs.is_empty() {
+                blocks.push(BasicBlock {
+                    id: cur_id,
+                    instrs: cur_block_instrs.clone(),
+                });
 
-            cur_id += 1;
-            cur_block_instrs.clear();
+                cur_id += 1;
+                cur_block_instrs.clear();
+            }
 
             // the label will go in the beginning of the next basicblock
             cur_block_instrs.push(instr.clone());
@@ -63,10 +65,12 @@ pub fn load_function_blocks(function: Rc<Function>) -> Vec<BasicBlock> {
     }
 
     // yield the final basic block
-    blocks.push(BasicBlock {
-        id: cur_id,
-        instrs: cur_block_instrs,
-    });
+    if !cur_block_instrs.is_empty() {
+        blocks.push(BasicBlock {
+            id: cur_id,
+            instrs: cur_block_instrs,
+        });
+    }
 
     blocks
 }
