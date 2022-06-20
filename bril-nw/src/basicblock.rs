@@ -19,6 +19,11 @@ pub struct BasicBlock {
     pub instrs: Vec<Rc<Instruction>>,
 }
 
+#[derive(Debug)]
+pub struct FunctionBlocks {
+    blocks: Vec<BasicBlock>,
+}
+
 impl BasicBlock {
     pub fn new(id: usize, instrs: Vec<Rc<Instruction>>) -> Self {
         BasicBlock { id, instrs }
@@ -29,7 +34,7 @@ impl BasicBlock {
     }
 }
 
-pub fn load_function_blocks(function: Rc<Function>) -> Vec<BasicBlock> {
+pub fn load_function_blocks(function: Rc<Function>) -> FunctionBlocks {
     let mut blocks: Vec<BasicBlock> = Vec::new();
 
     let mut cur_id: usize = 0;
@@ -72,5 +77,15 @@ pub fn load_function_blocks(function: Rc<Function>) -> Vec<BasicBlock> {
         });
     }
 
-    blocks
+    FunctionBlocks { blocks }
+}
+
+impl FunctionBlocks {
+    pub fn get_blocks(&self) -> &Vec<BasicBlock> {
+        &self.blocks
+    }
+
+    pub fn get_mut_blocks(&mut self) -> &mut Vec<BasicBlock> {
+        &mut self.blocks
+    }
 }

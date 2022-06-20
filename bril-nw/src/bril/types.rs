@@ -199,6 +199,21 @@ impl Instruction {
             _ => None,
         }
     }
+
+    pub fn get_dest(&self) -> Option<&str> {
+        match self {
+            Instruction::Const(c) => Some(&c.dest),
+            Instruction::Value(v) => Some(&v.dest),
+            _ => None,
+        }
+    }
+
+    pub fn get_args_copy(&self) -> Vec<String> {
+        match self {
+            Instruction::Value(v) => v.args.clone(),
+            _ => vec![],
+        }
+    }
 }
 
 fn get_jump_target_from_effect(e: &EffectInstruction) -> Vec<String> {

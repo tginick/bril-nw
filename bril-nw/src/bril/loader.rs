@@ -130,6 +130,7 @@ fn load_bril_instr(instr_v: &JsonValue) -> Result<Rc<Instruction>, BrilLoadError
         "print" => load_bril_effect_instr(op_str, instr_v),
         "jmp" => load_bril_effect_instr(op_str, instr_v),
         "ret" => load_bril_effect_instr(op_str, instr_v),
+        "add" => load_bril_value_instr(op_str, instr_v),
         _ => Err(BrilLoadError::UnrecognizedInstr(op_str.to_string())),
     }
 }
@@ -152,6 +153,30 @@ fn load_bril_const_instr(op: &str, instr_v: &JsonValue) -> Result<Rc<Instruction
         dest_str,
         instr_type,
         loaded_value,
+    ))
+}
+
+fn load_bril_value_instr(op: &str, instr_v: &JsonValue) -> Result<Rc<Instruction>, BrilLoadError> {
+    let dest = &instr_v["dest"];
+    let instr_type_str = &instr_v["type"];
+    let args = &instr_v["args"];
+    let funcs = &instr_v["funcs"];
+    let labels = &instr_v["labels"];
+
+    if !dest.is_string() {
+        return Err(BrilLoadError::MalformedInstr);
+    }
+
+    let dest_str = dest.as_str().unwrap().to_string();
+    let instr_type = load_bril_type(instr_type_str)?;
+
+    Ok(Instruction::new_value(
+        op,
+        dest_str,
+        instr_type,
+        load_string_array(args)?,
+        load_string_array(funcs)?,
+        load_string_array(labels)?,
     ))
 }
 
