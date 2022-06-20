@@ -28,14 +28,12 @@ pub fn create_control_flow_graph(blocks: &Vec<BasicBlock>) -> ControlFlowGraph {
             for target in targets {
                 if identifiers.contains_key(&target) {
                     target_idxs.push(*identifiers.get(&target).unwrap());
+                } else {
+                    // TODO: bad
                 }
             }
 
             edges.insert(blocks[i].get_id(), target_idxs);
-
-            // the rest of the instructions in this block will not be executed
-            // this is guaranteed, as a jump is a terminator instruction
-            break;
         } else if blocks[i].instrs[last_instr_idx].is_ret() {
             // do nothing. this block has no successors
             continue;
