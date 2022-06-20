@@ -159,11 +159,36 @@ impl Instruction {
         }
     }
 
+    pub fn is_jump(&self) -> bool {
+        if !self.is_instr() {
+            return false;
+        }
+
+        let op = self.get_op_code().unwrap();
+        return op == "br" || op == "jmp";
+    }
+
+    pub fn is_ret(&self) -> bool {
+        if !self.is_instr() {
+            return false;
+        }
+
+        let op = self.get_op_code().unwrap();
+        return op == "ret";
+    }
+
     pub fn get_op_code(&self) -> Option<&str> {
         match self {
             Instruction::Const(c) => Some(&c.op),
             Instruction::Value(v) => Some(&v.op),
             Instruction::Effect(e) => Some(&e.op),
+            _ => None,
+        }
+    }
+
+    pub fn get_jump_target(&self) -> Option<Vec<String>> {
+        match self {
+            Instruction::Effect(e) => Some(get_jump_target_from_effect(e)),
             _ => None,
         }
     }
@@ -174,4 +199,8 @@ impl Instruction {
             _ => None,
         }
     }
+}
+
+fn get_jump_target_from_effect(e: &EffectInstruction) -> Vec<String> {
+    e.labels.clone()
 }

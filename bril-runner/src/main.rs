@@ -43,6 +43,9 @@ fn main() {
     for func in loaded_bril.functions {
         let bb = bril_nw::basicblock::load_function_blocks(func.clone());
         println!("{:?}", bb);
+
+        let cfg = bril_nw::cfg::create_control_flow_graph(&bb);
+        println!("cfg: {:?}", cfg.edges);
     }
 }
 

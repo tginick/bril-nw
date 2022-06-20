@@ -15,16 +15,16 @@ lazy_static! {
 
 #[derive(Debug)]
 pub struct BasicBlock {
-    id: u32,
+    id: usize,
     pub instrs: Vec<Rc<Instruction>>,
 }
 
 impl BasicBlock {
-    pub fn new(id: u32, instrs: Vec<Rc<Instruction>>) -> Self {
+    pub fn new(id: usize, instrs: Vec<Rc<Instruction>>) -> Self {
         BasicBlock { id, instrs }
     }
 
-    pub fn get_id(&self) -> u32 {
+    pub fn get_id(&self) -> usize {
         self.id
     }
 }
@@ -32,7 +32,7 @@ impl BasicBlock {
 pub fn load_function_blocks(function: Rc<Function>) -> Vec<BasicBlock> {
     let mut blocks: Vec<BasicBlock> = Vec::new();
 
-    let mut cur_id: u32 = 0;
+    let mut cur_id: usize = 0;
 
     let mut cur_block_instrs: Vec<Rc<Instruction>> = Vec::new();
     for instr in &function.instrs {
