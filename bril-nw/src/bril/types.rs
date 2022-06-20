@@ -167,4 +167,11 @@ impl Instruction {
             _ => None,
         }
     }
+
+    pub fn get_label(&self) -> Option<&str> {
+        match self {
+            Instruction::Label(l) => Some(l),
+            _ => None,
+        }
+    }
 }
