@@ -214,6 +214,13 @@ impl Instruction {
             _ => vec![],
         }
     }
+
+    pub fn get_args(&self) -> Option<&Vec<String>> {
+        match self {
+            Instruction::Value(v) => Some(&v.args),
+            _ => None,
+        }
+    }
 }
 
 fn get_jump_target_from_effect(e: &EffectInstruction) -> Vec<String> {

@@ -1,0 +1,3 @@
+mod local_variable_redeclaration;
+
+pub use local_variable_redeclaration::LocalVariableRedeclaration;
