@@ -1,4 +1,4 @@
-use crate::{opt::LocalOptimizationPass, basicblock::BasicBlock};
+use crate::{basicblock::BasicBlock, opt::LocalOptimizationPass};
 
 pub struct LocalValueNumbering();
 
@@ -13,11 +13,7 @@ struct LVNTableEntry {
 }
 
 impl LocalOptimizationPass for LocalValueNumbering {
-    fn run(block: &mut BasicBlock) {
-        
-    }
+    fn run(block: &mut BasicBlock) {}
 }
 
-fn canonicalize_instruction() {
-
-}
+fn canonicalize_instruction() {}

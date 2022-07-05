@@ -211,6 +211,7 @@ impl Instruction {
     pub fn get_args_copy(&self) -> Vec<String> {
         match self {
             Instruction::Value(v) => v.args.clone(),
+            Instruction::Effect(e) => e.args.clone(),
             _ => vec![],
         }
     }
@@ -218,6 +219,7 @@ impl Instruction {
     pub fn get_args(&self) -> Option<&Vec<String>> {
         match self {
             Instruction::Value(v) => Some(&v.args),
+            Instruction::Effect(e) => Some(&e.args),
             _ => None,
         }
     }

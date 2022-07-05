@@ -1,4 +1,4 @@
-use crate::basicblock::{FunctionBlocks, BasicBlock};
+use crate::basicblock::{BasicBlock, FunctionBlocks};
 
 pub mod global;
 pub mod local;

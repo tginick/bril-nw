@@ -81,6 +81,9 @@ pub fn load_function_blocks(function: Rc<Function>) -> FunctionBlocks {
 }
 
 impl FunctionBlocks {
+    pub fn new(blocks: Vec<BasicBlock>) -> Self {
+        FunctionBlocks { blocks }
+    }
     pub fn get_blocks(&self) -> &Vec<BasicBlock> {
         &self.blocks
     }
