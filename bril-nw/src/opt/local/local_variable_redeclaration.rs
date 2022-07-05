@@ -30,7 +30,7 @@ pub struct LocalVariableRedeclaration();
         v = 2;
 */
 impl LocalOptimizationPass for LocalVariableRedeclaration {
-    fn run(block: &mut BasicBlock) {
+    fn run(&mut self, block: &mut BasicBlock) {
         loop {
             let did_delete_instructions = delete_unused_assignments(block);
             if !did_delete_instructions {

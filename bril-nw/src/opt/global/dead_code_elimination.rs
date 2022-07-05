@@ -5,7 +5,7 @@ use crate::{basicblock::FunctionBlocks, opt::GlobalOptimizationPass};
 pub struct DeadCodeElimination();
 
 impl GlobalOptimizationPass for DeadCodeElimination {
-    fn run(function: &mut FunctionBlocks) {
+    fn run(&mut self, function: &mut FunctionBlocks) {
         loop {
             // delete unused vars until convergence
             // this is not the most efficient way to implement this, but it works
@@ -95,7 +95,8 @@ mod tests {
         let bb = BasicBlock::new(0, instrs);
         let mut f = FunctionBlocks::new(vec![bb]);
 
-        DeadCodeElimination::run(&mut f);
+        let mut dce = DeadCodeElimination();
+        dce.run(&mut f);
 
         let updated_bb = &f.get_blocks()[0];
         assert_eq!(updated_bb.instrs.len(), 4);

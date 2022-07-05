@@ -13,7 +13,7 @@ struct LVNTableEntry {
 }
 
 impl LocalOptimizationPass for LocalValueNumbering {
-    fn run(block: &mut BasicBlock) {}
+    fn run(&mut self, block: &mut BasicBlock) {}
 }
 
 fn canonicalize_instruction() {}

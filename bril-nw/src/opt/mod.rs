@@ -4,9 +4,9 @@ pub mod global;
 pub mod local;
 
 pub trait GlobalOptimizationPass {
-    fn run(function: &mut FunctionBlocks);
+    fn run(&mut self, function: &mut FunctionBlocks);
 }
 
 pub trait LocalOptimizationPass {
-    fn run(block: &mut BasicBlock);
+    fn run(&mut self, block: &mut BasicBlock);
 }
