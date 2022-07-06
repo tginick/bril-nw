@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{fmt::Display, rc::Rc};
 
 #[derive(Debug)]
 pub struct Program {
@@ -26,15 +26,27 @@ pub enum Type {
     Unit,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum Value {
     Int(i32),
     Bool(bool),
 }
 
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum OpCode {
+    Id,
+    Const,
+    Add,
+    Mul,
+    Print,
+    Jump,
+    Branch,
+    Ret,
+}
+
 #[derive(Debug)]
 pub struct ConstInstruction {
-    pub op: String,
+    pub op: OpCode,
     pub dest: String,
     pub instr_type: Type,
     pub value: Value,
@@ -42,7 +54,7 @@ pub struct ConstInstruction {
 
 #[derive(Debug)]
 pub struct ValueInstruction {
-    pub op: String,
+    pub op: OpCode,
     pub dest: String,
     pub instr_type: Type,
     pub args: Vec<String>,
@@ -53,7 +65,7 @@ pub struct ValueInstruction {
 #[derive(Debug)]
 
 pub struct EffectInstruction {
-    pub op: String,
+    pub op: OpCode,
     pub args: Vec<String>,
     pub funcs: Vec<String>,
     pub labels: Vec<String>,
@@ -65,6 +77,48 @@ pub enum Instruction {
     Value(ValueInstruction),
     Effect(EffectInstruction),
     Label(String),
+}
+
+impl TryFrom<&str> for OpCode {
+    type Error = ();
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "id" => Ok(OpCode::Id),
+            "const" => Ok(OpCode::Const),
+            "add" => Ok(OpCode::Add),
+            "mul" => Ok(OpCode::Mul),
+            "jmp" => Ok(OpCode::Jump),
+            "br" => Ok(OpCode::Branch),
+            "ret" => Ok(OpCode::Ret),
+            "print" => Ok(OpCode::Print),
+            _ => Err(()),
+        }
+    }
+}
+
+impl Display for OpCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            OpCode::Id => write!(f, "id"),
+            OpCode::Const => write!(f, "const"),
+            OpCode::Add => write!(f, "add"),
+            OpCode::Mul => write!(f, "mul"),
+            OpCode::Jump => write!(f, "jmp"),
+            OpCode::Branch => write!(f, "br"),
+            OpCode::Ret => write!(f, "ret"),
+            OpCode::Print => write!(f, "print"),
+        }
+    }
+}
+
+impl Display for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Value::Int(i) => write!(f, "{}", i),
+            Value::Bool(b) => write!(f, "{}", b),
+        }
+    }
 }
 
 impl Program {
@@ -96,9 +150,9 @@ impl FunctionArg {
 }
 
 impl Instruction {
-    pub fn new_const(op: &str, dest: String, instr_type: Type, value: Value) -> Rc<Self> {
+    pub fn new_const(op: OpCode, dest: String, instr_type: Type, value: Value) -> Rc<Self> {
         Rc::new(Instruction::Const(ConstInstruction {
-            op: op.to_string(),
+            op,
             dest,
             instr_type,
             value,
@@ -106,7 +160,7 @@ impl Instruction {
     }
 
     pub fn new_value(
-        op: &str,
+        op: OpCode,
         dest: String,
         instr_type: Type,
         args: Vec<String>,
@@ -114,7 +168,7 @@ impl Instruction {
         labels: Vec<String>,
     ) -> Rc<Self> {
         Rc::new(Instruction::Value(ValueInstruction {
-            op: op.to_string(),
+            op,
             dest,
             instr_type,
             args,
@@ -124,13 +178,13 @@ impl Instruction {
     }
 
     pub fn new_effect(
-        op: &str,
+        op: OpCode,
         args: Vec<String>,
         funcs: Vec<String>,
         labels: Vec<String>,
     ) -> Rc<Self> {
         Rc::new(Instruction::Effect(EffectInstruction {
-            op: op.to_string(),
+            op,
             args,
             funcs,
             labels,
@@ -159,13 +213,34 @@ impl Instruction {
         }
     }
 
+    pub fn is_const(&self) -> bool {
+        match self {
+            Instruction::Const(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_value(&self) -> bool {
+        match self {
+            Instruction::Value(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_effect(&self) -> bool {
+        match self {
+            Instruction::Effect(_) => true,
+            _ => false,
+        }
+    }
+
     pub fn is_jump(&self) -> bool {
         if !self.is_instr() {
             return false;
         }
 
         let op = self.get_op_code().unwrap();
-        return op == "br" || op == "jmp";
+        return op == OpCode::Branch || op == OpCode::Jump;
     }
 
     pub fn is_ret(&self) -> bool {
@@ -174,14 +249,14 @@ impl Instruction {
         }
 
         let op = self.get_op_code().unwrap();
-        return op == "ret";
+        return op == OpCode::Ret;
     }
 
-    pub fn get_op_code(&self) -> Option<&str> {
+    pub fn get_op_code(&self) -> Option<OpCode> {
         match self {
-            Instruction::Const(c) => Some(&c.op),
-            Instruction::Value(v) => Some(&v.op),
-            Instruction::Effect(e) => Some(&e.op),
+            Instruction::Const(c) => Some(c.op),
+            Instruction::Value(v) => Some(v.op),
+            Instruction::Effect(e) => Some(e.op),
             _ => None,
         }
     }
@@ -220,6 +295,13 @@ impl Instruction {
         match self {
             Instruction::Value(v) => Some(&v.args),
             Instruction::Effect(e) => Some(&e.args),
+            _ => None,
+        }
+    }
+
+    pub fn get_const_value(&self) -> Option<Value> {
+        match self {
+            Instruction::Const(c) => Some(c.value),
             _ => None,
         }
     }

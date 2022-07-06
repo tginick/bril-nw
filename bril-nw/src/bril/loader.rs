@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use json::JsonValue;
 
-use super::types::{Function, FunctionArg, Instruction, Program, Type, Value};
+use super::types::{Function, FunctionArg, Instruction, Program, Type, Value, OpCode};
 
 #[derive(Debug)]
 pub enum BrilLoadError {
@@ -125,17 +125,24 @@ fn load_bril_instr(instr_v: &JsonValue) -> Result<Rc<Instruction>, BrilLoadError
 
     let op_str = op.as_str().unwrap();
 
-    match op_str {
-        "const" => load_bril_const_instr(op_str, instr_v),
-        "print" => load_bril_effect_instr(op_str, instr_v),
-        "jmp" => load_bril_effect_instr(op_str, instr_v),
-        "ret" => load_bril_effect_instr(op_str, instr_v),
-        "add" => load_bril_value_instr(op_str, instr_v),
+    let real_op: Result<OpCode, ()> = op_str.try_into();
+    if let Err(_) = real_op {
+        return Err(BrilLoadError::MalformedInstr);
+    }
+
+    let real_op = real_op.unwrap();
+
+    match real_op {
+        OpCode::Const => load_bril_const_instr(real_op, instr_v),
+        OpCode::Print => load_bril_effect_instr(real_op, instr_v),
+        OpCode::Jump => load_bril_effect_instr(real_op, instr_v),
+        OpCode::Ret => load_bril_effect_instr(real_op, instr_v),
+        OpCode::Add => load_bril_value_instr(real_op, instr_v),
         _ => Err(BrilLoadError::UnrecognizedInstr(op_str.to_string())),
     }
 }
 
-fn load_bril_const_instr(op: &str, instr_v: &JsonValue) -> Result<Rc<Instruction>, BrilLoadError> {
+fn load_bril_const_instr(op: OpCode, instr_v: &JsonValue) -> Result<Rc<Instruction>, BrilLoadError> {
     let dest = &instr_v["dest"];
     let instr_type_str = &instr_v["type"];
     let value = &instr_v["value"];
@@ -156,7 +163,7 @@ fn load_bril_const_instr(op: &str, instr_v: &JsonValue) -> Result<Rc<Instruction
     ))
 }
 
-fn load_bril_value_instr(op: &str, instr_v: &JsonValue) -> Result<Rc<Instruction>, BrilLoadError> {
+fn load_bril_value_instr(op: OpCode, instr_v: &JsonValue) -> Result<Rc<Instruction>, BrilLoadError> {
     let dest = &instr_v["dest"];
     let instr_type_str = &instr_v["type"];
     let args = &instr_v["args"];
@@ -180,7 +187,7 @@ fn load_bril_value_instr(op: &str, instr_v: &JsonValue) -> Result<Rc<Instruction
     ))
 }
 
-fn load_bril_effect_instr(op: &str, instr_v: &JsonValue) -> Result<Rc<Instruction>, BrilLoadError> {
+fn load_bril_effect_instr(op: OpCode, instr_v: &JsonValue) -> Result<Rc<Instruction>, BrilLoadError> {
     let args = &instr_v["args"];
     let funcs = &instr_v["funcs"];
     let labels = &instr_v["labels"];

@@ -1,13 +1,13 @@
 use std::{collections::HashSet, rc::Rc};
 
-use crate::bril::types::{Function, Instruction};
+use crate::bril::types::{Function, Instruction, OpCode};
 
 lazy_static! {
-    static ref TERMINATOR_INSTS: HashSet<&'static str> = {
+    static ref TERMINATOR_INSTS: HashSet<OpCode> = {
         let mut insts = HashSet::new();
-        insts.insert("br");
-        insts.insert("jmp");
-        insts.insert("ret");
+        insts.insert(OpCode::Branch);
+        insts.insert(OpCode::Jump);
+        insts.insert(OpCode::Ret);
 
         insts
     };
@@ -44,7 +44,7 @@ pub fn load_function_blocks(function: Rc<Function>) -> FunctionBlocks {
         if instr.is_instr() {
             cur_block_instrs.push(instr.clone());
 
-            if TERMINATOR_INSTS.contains(instr.get_op_code().unwrap()) {
+            if TERMINATOR_INSTS.contains(&instr.get_op_code().unwrap()) {
                 blocks.push(BasicBlock {
                     id: cur_id,
                     instrs: cur_block_instrs.clone(),

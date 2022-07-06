@@ -59,7 +59,7 @@ fn delete_unused_vars(function: &mut FunctionBlocks) -> bool {
 mod tests {
     use crate::{
         basicblock::{BasicBlock, FunctionBlocks},
-        bril::types::{Instruction, Type, Value},
+        bril::types::{Instruction, OpCode, Type, Value},
         opt::GlobalOptimizationPass,
     };
 
@@ -68,12 +68,12 @@ mod tests {
     #[test]
     fn test_1() {
         let instrs = vec![
-            Instruction::new_const("const", "a".to_string(), Type::Int, Value::Int(4)),
-            Instruction::new_const("const", "b".to_string(), Type::Int, Value::Int(2)),
+            Instruction::new_const(OpCode::Const, "a".to_string(), Type::Int, Value::Int(4)),
+            Instruction::new_const(OpCode::Const, "b".to_string(), Type::Int, Value::Int(2)),
             // following instr is eliminated
-            Instruction::new_const("const", "c".to_string(), Type::Int, Value::Int(1)),
+            Instruction::new_const(OpCode::Const, "c".to_string(), Type::Int, Value::Int(1)),
             Instruction::new_value(
-                "add",
+                OpCode::Add,
                 "d".to_string(),
                 Type::Int,
                 vec!["a".to_string(), "b".to_string()],
@@ -82,14 +82,14 @@ mod tests {
             ),
             // following instr is eliminated
             Instruction::new_value(
-                "add",
+                OpCode::Add,
                 "e".to_string(),
                 Type::Int,
                 vec!["c".to_string(), "d".to_string()],
                 vec![],
                 vec![],
             ),
-            Instruction::new_effect("print", vec!["d".to_string()], vec![], vec![]),
+            Instruction::new_effect(OpCode::Print, vec!["d".to_string()], vec![], vec![]),
         ];
 
         let bb = BasicBlock::new(0, instrs);
