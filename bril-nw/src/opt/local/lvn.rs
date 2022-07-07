@@ -41,6 +41,14 @@ impl LocalOptimizationPass for LocalValueNumbering {
 }
 
 impl LocalValueNumbering {
+    pub fn new() -> Self {
+        LocalValueNumbering {
+            env: HashMap::new(),
+            table: HashMap::new(),
+            names: HashMap::new(),
+        }
+    }
+
     fn get_current_ordinal(&self) -> usize {
         self.table.len()
     }
@@ -178,4 +186,59 @@ fn canonicalize_value_instr(
         op: instr.get_op_code().unwrap().to_string(),
         args: arg_ordinals,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        basicblock::{BasicBlock},
+        bril::types::{Instruction, OpCode, Type, Value},
+        opt::LocalOptimizationPass,
+    };
+
+    use super::LocalValueNumbering;
+
+    #[test]
+    fn test_1() {
+        let instrs = vec![
+            Instruction::new_const(OpCode::Const, "a".to_string(), Type::Int, Value::Int(4)),
+            Instruction::new_const(OpCode::Const, "b".to_string(), Type::Int, Value::Int(2)),
+            Instruction::new_value(
+                OpCode::Add,
+                "sum1".to_string(),
+                Type::Int,
+                vec!["a".to_string(), "b".to_string()],
+                vec![],
+                vec![],
+            ),
+            // this instr is duplicate. it should be rewritten to `id sum1`
+            Instruction::new_value(
+                OpCode::Add,
+                "sum2".to_string(),
+                Type::Int,
+                vec!["a".to_string(), "b".to_string()],
+                vec![],
+                vec![],
+            ),
+            // since sum1 and sum2 computed the same thing, this should be written to `mul sum1 sum1`
+            Instruction::new_value(
+                OpCode::Mul,
+                "prod".to_string(),
+                Type::Int,
+                vec!["sum1".to_string(), "sum2".to_string()],
+                vec![],
+                vec![],
+            ),
+        ];
+
+        let mut bb = BasicBlock::new(0, instrs);
+
+        let mut lvn = LocalValueNumbering::new();
+        lvn.run(&mut bb);
+
+        assert_eq!(bb.instrs.len(), 5);
+        assert_eq!(bb.instrs[3].get_op_code().unwrap(), OpCode::Id);
+        assert_eq!(bb.instrs[3].get_args_copy()[0], "sum1".to_string());
+        assert_eq!(bb.instrs[4].get_args_copy(), vec!["sum1".to_string(), "sum1".to_string()]);
+    }
 }
