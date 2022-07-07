@@ -140,11 +140,18 @@ impl LocalValueNumbering {
                 .args
                 .iter()
                 .map(|arg_ordinal| {
-                    let existing_canonical_name = self.names.get(&arg_ordinal).unwrap();
-
-                    existing_canonical_name.clone()
+                    let existing_canonical_name = self.names.get(&arg_ordinal);
+                    existing_canonical_name.map(|s| s.clone())
                 })
+                .filter(|o| o.is_some())
+                .map(|o| o.unwrap())
                 .collect();
+
+            if updated_args.len() != canon_instr.args.len() {
+                // something weird happened.
+                // TODO bad
+                return;
+            }
 
             let new_instr = Instruction::new_value(
                 instr.get_op_code().unwrap(),
