@@ -191,7 +191,7 @@ fn canonicalize_value_instr(
 #[cfg(test)]
 mod tests {
     use crate::{
-        basicblock::{BasicBlock},
+        basicblock::BasicBlock,
         bril::types::{Instruction, OpCode, Type, Value},
         opt::LocalOptimizationPass,
     };
@@ -239,6 +239,9 @@ mod tests {
         assert_eq!(bb.instrs.len(), 5);
         assert_eq!(bb.instrs[3].get_op_code().unwrap(), OpCode::Id);
         assert_eq!(bb.instrs[3].get_args_copy()[0], "sum1".to_string());
-        assert_eq!(bb.instrs[4].get_args_copy(), vec!["sum1".to_string(), "sum1".to_string()]);
+        assert_eq!(
+            bb.instrs[4].get_args_copy(),
+            vec!["sum1".to_string(), "sum1".to_string()]
+        );
     }
 }
