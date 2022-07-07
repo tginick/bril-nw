@@ -261,6 +261,15 @@ impl Instruction {
         }
     }
 
+    pub fn change_op_code(&mut self, new_op: OpCode) {
+        match self {
+            Instruction::Const(c) => c.op = new_op,
+            Instruction::Value(v) => v.op = new_op,
+            Instruction::Effect(e) => e.op = new_op,
+            _ => (),
+        }
+    }
+
     pub fn get_jump_target(&self) -> Option<Vec<String>> {
         match self {
             Instruction::Effect(e) => Some(get_jump_target_from_effect(e)),
@@ -299,9 +308,41 @@ impl Instruction {
         }
     }
 
+    pub fn get_args_mut(&mut self) -> Option<&mut Vec<String>> {
+        match self {
+            Instruction::Value(v) => Some(&mut v.args),
+            Instruction::Effect(e) => Some(&mut e.args),
+            _ => None,
+        }
+    }
+
     pub fn get_const_value(&self) -> Option<Value> {
         match self {
             Instruction::Const(c) => Some(c.value),
+            _ => None,
+        }
+    }
+
+    pub fn get_type(&self) -> Option<Type> {
+        match self {
+            Instruction::Const(c) => Some(c.instr_type),
+            Instruction::Value(v) => Some(v.instr_type),
+            _ => None,
+        }
+    }
+
+    pub fn get_funcs_copy(&self) -> Option<Vec<String>> {
+        match self {
+            Instruction::Value(v) => Some(v.funcs.clone()),
+            Instruction::Effect(e) => Some(e.funcs.clone()),
+            _ => None,
+        }
+    }
+
+    pub fn get_labels_copy(&self) -> Option<Vec<String>> {
+        match self {
+            Instruction::Value(v) => Some(v.labels.clone()),
+            Instruction::Effect(e) => Some(e.labels.clone()),
             _ => None,
         }
     }
