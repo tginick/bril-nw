@@ -2,6 +2,8 @@ use std::collections::HashMap;
 
 use crate::basicblock::BasicBlock;
 
+const BLOCK_NAME_PFX: &'static str = "block_";
+
 #[derive(Debug)]
 pub struct ControlFlowGraph {
     pub edges: HashMap<usize, Vec<usize>>,
@@ -22,7 +24,7 @@ pub fn create_control_flow_graph(blocks: &Vec<BasicBlock>) -> ControlFlowGraph {
                 .get_jump_target()
                 .unwrap()
                 .iter()
-                .map(|l| format!("block_{}", l))
+                .map(|l| format!("{}{}", BLOCK_NAME_PFX, l))
                 .collect();
             let mut target_idxs = Vec::new();
             for target in targets {
@@ -57,13 +59,14 @@ fn identify_basic_blocks(blocks: &Vec<BasicBlock>) -> HashMap<String, usize> {
         if cur_block.instrs[0].is_label() {
             identifiers.insert(
                 format!(
-                    "block_{}",
+                    "{}{}",
+                    BLOCK_NAME_PFX,
                     cur_block.instrs[0].get_label().unwrap().to_string()
                 ),
                 i,
             );
         } else {
-            identifiers.insert(format!("block_{}", identifiers.len()), i);
+            identifiers.insert(format!("{}{}", BLOCK_NAME_PFX, identifiers.len()), i);
         }
     }
 
