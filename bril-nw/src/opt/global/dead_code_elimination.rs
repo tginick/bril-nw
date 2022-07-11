@@ -57,6 +57,8 @@ fn delete_unused_vars(function: &mut FunctionBlocks) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use crate::{
         basicblock::{BasicBlock, FunctionBlocks},
         bril::types::{Instruction, OpCode, Type, Value},
@@ -93,7 +95,8 @@ mod tests {
         ];
 
         let bb = BasicBlock::new(0, instrs);
-        let mut f = FunctionBlocks::new(vec![bb]);
+
+        let mut f = FunctionBlocks::new("test", vec![], vec![bb], HashMap::new());
 
         let mut dce = DeadCodeElimination();
         dce.run(&mut f);

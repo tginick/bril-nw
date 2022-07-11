@@ -1,6 +1,7 @@
 extern crate bril_nw;
 extern crate clap;
 
+use bril_nw::{basicblock, bril, cfg};
 use std::{fs, path::Path, process};
 
 use clap::{arg, command};
@@ -30,7 +31,7 @@ fn main() {
 
     let contents = contents.unwrap();
 
-    let loaded_bril = bril_nw::bril::loader::load_bril(&contents);
+    let loaded_bril = bril::loader::load_bril(&contents);
     drop(contents);
 
     if let Err(e) = loaded_bril {
@@ -41,10 +42,10 @@ fn main() {
     let loaded_bril = loaded_bril.unwrap();
 
     for func in loaded_bril.functions {
-        let bb = bril_nw::basicblock::load_function_blocks(func.clone());
+        let bb = basicblock::load_function_blocks(func.clone());
         println!("{:?}", bb);
 
-        let cfg = bril_nw::cfg::ControlFlowGraph::create_from_basic_blocks(bb.get_blocks());
+        let cfg = cfg::ControlFlowGraph::create_from_basic_blocks(bb.get_blocks());
         println!("cfg: {:?}", cfg.successors);
     }
 }
