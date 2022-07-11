@@ -1,4 +1,5 @@
 use std::{
+    cell::RefCell,
     collections::{HashMap, HashSet},
     rc::Rc,
 };
@@ -19,6 +20,7 @@ lazy_static! {
 #[derive(Debug)]
 pub struct BasicBlock {
     id: usize,
+    name: RefCell<String>,
     pub instrs: Vec<Rc<Instruction>>,
 }
 
@@ -32,11 +34,23 @@ pub struct FunctionBlocks {
 
 impl BasicBlock {
     pub fn new(id: usize, instrs: Vec<Rc<Instruction>>) -> Self {
-        BasicBlock { id, instrs }
+        BasicBlock {
+            id,
+            instrs,
+            name: RefCell::new("".to_string()),
+        }
     }
 
     pub fn get_id(&self) -> usize {
         self.id
+    }
+
+    pub fn set_name(&self, new_name: &str) {
+        *self.name.borrow_mut() = new_name.to_string();
+    }
+
+    pub fn get_name(&self) -> String {
+        self.name.borrow().clone()
     }
 }
 
@@ -102,7 +116,7 @@ fn add_block(
     let next_idx = blocks.len();
     block_id_to_idx.insert(new_id, next_idx);
 
-    blocks.push(BasicBlock { id: new_id, instrs });
+    blocks.push(BasicBlock::new(new_id, instrs));
 }
 
 impl FunctionBlocks {

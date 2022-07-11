@@ -86,16 +86,20 @@ fn identify_basic_blocks(blocks: &Vec<BasicBlock>) -> HashMap<String, usize> {
         }
 
         if cur_block.instrs[0].is_label() {
-            identifiers.insert(
-                format!(
-                    "{}{}",
-                    BLOCK_NAME_PFX,
-                    cur_block.instrs[0].get_label().unwrap().to_string()
-                ),
-                i,
+            let block_name = format!(
+                "{}{}",
+                BLOCK_NAME_PFX,
+                cur_block.instrs[0].get_label().unwrap().to_string()
             );
+
+            cur_block.set_name(&block_name);
+
+            identifiers.insert(block_name, i);
         } else {
-            identifiers.insert(format!("{}{}", BLOCK_NAME_PFX, identifiers.len()), i);
+            let block_name = format!("{}{}", BLOCK_NAME_PFX, identifiers.len());
+            cur_block.set_name(&block_name);
+
+            identifiers.insert(block_name, i);
         }
     }
 
