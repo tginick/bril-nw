@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::basicblock::BasicBlock;
 
@@ -10,6 +10,12 @@ pub struct ControlFlowGraph {
     pub successors: HashMap<usize, Vec<usize>>,
     all_block_ids: Vec<usize>,
 }
+
+pub type Dominators = HashMap<usize, HashSet<usize>>;
+pub type StrictDominators = Dominators;
+
+pub type ImmediateDominators = HashMap<usize, usize>;
+pub type DominatorTree = HashMap<usize, HashSet<usize>>;
 
 impl ControlFlowGraph {
     pub fn create_from_basic_blocks(blocks: &Vec<BasicBlock>) -> Self {
@@ -81,9 +87,22 @@ impl ControlFlowGraph {
         }
     }
 
-    pub fn get_dominators(&self) -> HashMap<usize, HashSet<usize>> {
+    pub fn find_dominators(&self) -> Dominators {
         let mut dominators: HashMap<usize, HashSet<usize>> = HashMap::new();
         let mut should_continue = true;
+
+        let all_block_ids_set = self
+            .all_block_ids
+            .iter()
+            .copied()
+            .collect::<HashSet<usize>>();
+        for block_id in &self.all_block_ids {
+            if *block_id == 0 {
+                dominators.insert(0, HashSet::from([0]));
+            } else {
+                dominators.insert(*block_id, all_block_ids_set.clone());
+            }
+        }
 
         while should_continue {
             should_continue = false;
@@ -136,6 +155,94 @@ impl ControlFlowGraph {
 
         dominators
     }
+
+    pub fn find_immediate_dominators(&self, dominators: &Dominators) -> ImmediateDominators {
+        let mut result: HashMap<usize, usize> = HashMap::new();
+        for block_id in &self.all_block_ids {
+            if *block_id == 0 {
+                continue; // entry node has no immediate dominator
+            }
+
+            result.insert(
+                *block_id,
+                self.find_immediate_dominator(*block_id, dominators.get(block_id).unwrap()),
+            );
+        }
+
+        result
+    }
+
+    pub fn find_immediate_dominator(
+        &self,
+        block_id: usize,
+        block_dominators: &HashSet<usize>,
+    ) -> usize {
+        // run bfs through predecessors, returning the first node that is a dominator of block_id
+        let mut open_set: VecDeque<usize> = VecDeque::new();
+        let mut closed_set: HashSet<usize> = HashSet::new();
+        for pred in self.predecessors.get(&block_id).unwrap_or(&Vec::new()) {
+            open_set.push_back(*pred);
+        }
+
+        while !open_set.is_empty() {
+            let next = open_set.pop_front().unwrap();
+            if block_dominators.contains(&next) {
+                return next;
+            } else {
+                closed_set.insert(next);
+                for pred in self.predecessors.get(&next).unwrap_or(&Vec::new()) {
+                    if !closed_set.contains(pred) {
+                        open_set.push_back(*pred);
+                    }
+                }
+            }
+        }
+
+        // every node has an immediate dominator. don't think we should be getting here.
+        0
+    }
+
+    pub fn create_dominator_tree(&self, dominators: Dominators) -> DominatorTree {
+        let strict_dominators = retain_only_strict_dominators(dominators);
+        let immediate_dominators = self.find_immediate_dominators(&strict_dominators);
+
+        let mut result = DominatorTree::new();
+
+        for block_id in immediate_dominators.keys() {
+            let immediate_dominator = immediate_dominators.get(block_id).unwrap();
+            if result.contains_key(immediate_dominator) {
+                result
+                    .get_mut(immediate_dominator)
+                    .unwrap()
+                    .insert(*block_id);
+            } else {
+                result.insert(*immediate_dominator, HashSet::from([*block_id]));
+            }
+        }
+
+        result
+    }
+}
+
+pub fn retain_only_strict_dominators(dominators: Dominators) -> StrictDominators {
+    let block_ids = dominators.keys().copied().collect::<Vec<usize>>();
+
+    let mut result: HashMap<usize, HashSet<usize>> = HashMap::new();
+
+    for block_id in block_ids {
+        let block_dominators = dominators.get(&block_id);
+
+        if let None = block_dominators {
+            continue;
+        }
+
+        let mut block_dominators = block_dominators.unwrap().clone();
+        block_dominators.remove(&block_id);
+
+        result.insert(block_id, block_dominators);
+    }
+
+    result
 }
 
 fn identify_basic_blocks(blocks: &Vec<BasicBlock>) -> HashMap<String, usize> {
