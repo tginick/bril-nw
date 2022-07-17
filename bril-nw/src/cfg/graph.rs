@@ -222,6 +222,36 @@ impl ControlFlowGraph {
 
         result
     }
+
+    pub fn get_dominance_frontier(
+        &self,
+        dominator_tree: &DominatorTree,
+        block_id: usize,
+    ) -> HashSet<usize> {
+        let dominated_nodes = dominator_tree.get(&block_id);
+
+        if let None = dominated_nodes {
+            return HashSet::new();
+        }
+
+        let dominated_nodes = dominated_nodes.unwrap();
+
+        // look through all the successors of dominated nodes, eliminating those that are also in dominated_nodes
+        let mut all_successors_of_dominated: HashSet<usize> = HashSet::new();
+        for dominated_node in dominated_nodes.iter() {
+            all_successors_of_dominated.extend(
+                self.successors
+                    .get(dominated_node)
+                    .unwrap_or(&Vec::new())
+                    .iter(),
+            );
+        }
+
+        all_successors_of_dominated
+            .difference(dominated_nodes)
+            .copied()
+            .collect()
+    }
 }
 
 pub fn retain_only_strict_dominators(dominators: Dominators) -> StrictDominators {

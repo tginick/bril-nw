@@ -1,5 +1,3 @@
 pub mod reaching_definitions;
 
-pub trait DataFlowAnalysis {
-    
-}
+pub trait DataFlowAnalysis {}
