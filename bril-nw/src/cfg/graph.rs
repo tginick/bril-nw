@@ -87,6 +87,15 @@ impl ControlFlowGraph {
 
         while should_continue {
             should_continue = false;
+
+            // traversing in reverse post-order is most optimal for well-behaved reducible cfgs
+            // but this isn't too bad
+            // natural loop - single entry (in-edge) into the cycle
+            // c-like languages (minus goto) mostly only have natural loops
+            // back edge - an edge A (tail) -> B (head) where B dominates A
+            // more formally - for a back edge A -> B: smallest set of vertices L including A and B s.t. for all v in L, PREDS(v) in L OR v = B
+            // reducible control flow: every back edge has a natural loop
+            // e.g. if you remove all edges traversed after a BFS, the remainder are back edges
             for block_id in &self.all_block_ids {
                 // a block A is "dominated" by another block B if B dominates all of A's predecessors
                 let block_predecessors = self.predecessors.get(block_id);
