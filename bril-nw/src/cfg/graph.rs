@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::basicblock::BasicBlock;
 
@@ -8,6 +8,7 @@ const BLOCK_NAME_PFX: &'static str = "block_";
 pub struct ControlFlowGraph {
     pub predecessors: HashMap<usize, Vec<usize>>,
     pub successors: HashMap<usize, Vec<usize>>,
+    all_block_ids: Vec<usize>,
 }
 
 impl ControlFlowGraph {
@@ -15,9 +16,12 @@ impl ControlFlowGraph {
         let identifiers = identify_basic_blocks(&blocks);
         let mut predecessors: HashMap<usize, Vec<usize>> = HashMap::new();
         let mut successors: HashMap<usize, Vec<usize>> = HashMap::new();
+        let mut all_block_ids: Vec<usize> = Vec::with_capacity(blocks.len());
 
         for i in 0..blocks.len() {
             let last_instr_idx = blocks[i].instrs.len() - 1;
+
+            all_block_ids.push(blocks[i].get_id());
 
             // check if last instr is a jump
             // if yes, create edges based on jump target
@@ -73,7 +77,55 @@ impl ControlFlowGraph {
         ControlFlowGraph {
             predecessors,
             successors,
+            all_block_ids,
         }
+    }
+
+    pub fn get_dominators(&self) -> HashMap<usize, HashSet<usize>> {
+        let mut dominators: HashMap<usize, HashSet<usize>> = HashMap::new();
+        let mut should_continue = true;
+
+        while should_continue {
+            should_continue = false;
+            for block_id in &self.all_block_ids {
+                // a block A is "dominated" by another block B if B dominates all of A's predecessors
+                let block_predecessors = self.predecessors.get(block_id);
+                if let None = block_predecessors {
+                    continue;
+                }
+
+                let block_predecessors = block_predecessors.unwrap();
+                let block_pred_dominator_estimates: Vec<HashSet<usize>> = block_predecessors
+                    .iter()
+                    .map(|pred_id| {
+                        dominators
+                            .get(pred_id)
+                            .map_or(HashSet::new(), |v| v.clone())
+                    })
+                    .collect();
+
+                let mut block_pred_dominator_intersection = block_pred_dominator_estimates
+                    .into_iter()
+                    .fold(HashSet::new(), |a, h| a.intersection(&h).copied().collect());
+
+                // domination is reflexive
+                block_pred_dominator_intersection.insert(*block_id);
+
+                let current_dominator_set = dominators.get(block_id);
+                if let None = current_dominator_set {
+                    should_continue = true;
+                }
+
+                let current_dominator_set = current_dominator_set.unwrap();
+                if current_dominator_set != &block_pred_dominator_intersection {
+                    should_continue = true;
+                }
+
+                dominators.insert(*block_id, block_pred_dominator_intersection);
+            }
+        }
+
+        dominators
     }
 }
 
