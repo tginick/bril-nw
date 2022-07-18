@@ -315,7 +315,7 @@ mod tests {
 
     use crate::cfg::graph::retain_only_strict_dominators;
 
-    use super::{ControlFlowGraph, ImmediateDominators, DominatorTree};
+    use super::{ControlFlowGraph, DominatorTree, ImmediateDominators};
 
     fn get_test_cfg_1() -> ControlFlowGraph {
         ControlFlowGraph {
@@ -332,6 +332,26 @@ mod tests {
                 (3, vec![1]),
                 (4, vec![2]),
                 (5, vec![2, 4]),
+            ]),
+            all_block_ids: vec![0, 1, 2, 3, 4, 5],
+        }
+    }
+
+    fn get_test_cfg_2() -> ControlFlowGraph {
+        ControlFlowGraph {
+            successors: HashMap::from([
+                (0, vec![1]),
+                (1, vec![2, 3, 5]),
+                (2, vec![4]),
+                (3, vec![4]),
+                (5, vec![1]),
+            ]),
+            predecessors: HashMap::from([
+                (1, vec![0, 4]),
+                (2, vec![1]),
+                (3, vec![1]),
+                (4, vec![2, 3]),
+                (5, vec![1]),
             ]),
             all_block_ids: vec![0, 1, 2, 3, 4, 5],
         }
@@ -379,13 +399,7 @@ mod tests {
         let dominators = cfg.find_dominators();
         let immediate_dominators = cfg.find_immediate_dominators(&dominators);
 
-        let expected: ImmediateDominators = HashMap::from([
-            (1, 0),
-            (2, 1),
-            (3, 1),
-            (4, 2),
-            (5, 2)
-        ]);
+        let expected: ImmediateDominators = HashMap::from([(1, 0), (2, 1), (3, 1), (4, 2), (5, 2)]);
 
         assert_eq!(immediate_dominators, expected);
     }
@@ -402,6 +416,19 @@ mod tests {
             (1, HashSet::from([2, 3])),
             (2, HashSet::from([4, 5])),
         ]);
+
+        assert_eq!(dominator_tree, expected);
+    }
+
+    #[test]
+    fn test_dominator_tree_2() {
+        let cfg = get_test_cfg_2();
+
+        let dominators = cfg.find_dominators();
+        let dominator_tree = cfg.create_dominator_tree(dominators);
+
+        let expected: DominatorTree =
+            HashMap::from([(0, HashSet::from([1])), (1, HashSet::from([2, 3, 4, 5]))]);
 
         assert_eq!(dominator_tree, expected);
     }
