@@ -313,9 +313,11 @@ fn identify_basic_blocks(blocks: &Vec<BasicBlock>) -> HashMap<String, usize> {
 mod tests {
     use std::collections::{HashMap, HashSet};
 
-    use super::ControlFlowGraph;
+    use crate::cfg::graph::retain_only_strict_dominators;
 
-    fn get_test_cfg() -> ControlFlowGraph {
+    use super::{ControlFlowGraph, ImmediateDominators, DominatorTree};
+
+    fn get_test_cfg_1() -> ControlFlowGraph {
         ControlFlowGraph {
             successors: HashMap::from([
                 (0, vec![1]),
@@ -337,7 +339,7 @@ mod tests {
 
     #[test]
     fn test_find_dominators_1() {
-        let cfg = get_test_cfg();
+        let cfg = get_test_cfg_1();
 
         let dominators = cfg.find_dominators();
         let expected: HashMap<usize, HashSet<usize>> = HashMap::from([
@@ -350,5 +352,57 @@ mod tests {
         ]);
 
         assert_eq!(dominators, expected);
+    }
+
+    #[test]
+    fn test_find_strict_dominators_1() {
+        let cfg = get_test_cfg_1();
+
+        let dominators = cfg.find_dominators();
+        let strict_dominators = retain_only_strict_dominators(dominators);
+        let expected: HashMap<usize, HashSet<usize>> = HashMap::from([
+            (0, HashSet::from([])),
+            (1, HashSet::from([0])),
+            (2, HashSet::from([0, 1])),
+            (3, HashSet::from([0, 1])),
+            (4, HashSet::from([0, 1, 2])),
+            (5, HashSet::from([0, 1, 2])),
+        ]);
+
+        assert_eq!(strict_dominators, expected);
+    }
+
+    #[test]
+    fn test_find_immediate_dominators_1() {
+        let cfg = get_test_cfg_1();
+
+        let dominators = cfg.find_dominators();
+        let immediate_dominators = cfg.find_immediate_dominators(&dominators);
+
+        let expected: ImmediateDominators = HashMap::from([
+            (1, 0),
+            (2, 1),
+            (3, 1),
+            (4, 2),
+            (5, 2)
+        ]);
+
+        assert_eq!(immediate_dominators, expected);
+    }
+
+    #[test]
+    fn test_dominator_tree_1() {
+        let cfg = get_test_cfg_1();
+
+        let dominators = cfg.find_dominators();
+        let dominator_tree = cfg.create_dominator_tree(dominators);
+
+        let expected: DominatorTree = HashMap::from([
+            (0, HashSet::from([1])),
+            (1, HashSet::from([2, 3])),
+            (2, HashSet::from([4, 5])),
+        ]);
+
+        assert_eq!(dominator_tree, expected);
     }
 }
