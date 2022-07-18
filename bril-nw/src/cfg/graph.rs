@@ -161,7 +161,7 @@ impl ControlFlowGraph {
         dominators
     }
 
-    pub fn find_immediate_dominators(&self, dominators: &Dominators) -> ImmediateDominators {
+    pub fn find_immediate_dominators(&self, dominators: &StrictDominators) -> ImmediateDominators {
         let mut result: HashMap<usize, usize> = HashMap::new();
         for block_id in &self.all_block_ids {
             if *block_id == 0 {
@@ -397,7 +397,8 @@ mod tests {
         let cfg = get_test_cfg_1();
 
         let dominators = cfg.find_dominators();
-        let immediate_dominators = cfg.find_immediate_dominators(&dominators);
+        let immediate_dominators =
+            cfg.find_immediate_dominators(&retain_only_strict_dominators(dominators));
 
         let expected: ImmediateDominators = HashMap::from([(1, 0), (2, 1), (3, 1), (4, 2), (5, 2)]);
 
