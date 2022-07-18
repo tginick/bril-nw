@@ -132,9 +132,14 @@ impl ControlFlowGraph {
                     })
                     .collect();
 
-                let mut block_pred_dominator_intersection = block_pred_dominator_estimates
-                    .into_iter()
-                    .fold(HashSet::new(), |a, h| a.intersection(&h).copied().collect());
+                let mut block_pred_dominator_iter = block_pred_dominator_estimates.into_iter();
+
+                let mut block_pred_dominator_intersection = block_pred_dominator_iter
+                    .next()
+                    .map_or(HashSet::new(), |s| {
+                        block_pred_dominator_iter
+                            .fold(s, |s1, s2| s1.intersection(&s2).cloned().collect())
+                    });
 
                 // domination is reflexive
                 block_pred_dominator_intersection.insert(*block_id);
@@ -302,4 +307,48 @@ fn identify_basic_blocks(blocks: &Vec<BasicBlock>) -> HashMap<String, usize> {
     }
 
     identifiers
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::{HashMap, HashSet};
+
+    use super::ControlFlowGraph;
+
+    fn get_test_cfg() -> ControlFlowGraph {
+        ControlFlowGraph {
+            successors: HashMap::from([
+                (0, vec![1]),
+                (1, vec![2, 3]),
+                (2, vec![4, 5]),
+                (4, vec![5]),
+                (5, vec![1]),
+            ]),
+            predecessors: HashMap::from([
+                (1, vec![0, 5]),
+                (2, vec![1]),
+                (3, vec![1]),
+                (4, vec![2]),
+                (5, vec![2, 4]),
+            ]),
+            all_block_ids: vec![0, 1, 2, 3, 4, 5],
+        }
+    }
+
+    #[test]
+    fn test_find_dominators_1() {
+        let cfg = get_test_cfg();
+
+        let dominators = cfg.find_dominators();
+        let expected: HashMap<usize, HashSet<usize>> = HashMap::from([
+            (0, HashSet::from([0])),
+            (1, HashSet::from([0, 1])),
+            (2, HashSet::from([0, 1, 2])),
+            (3, HashSet::from([0, 1, 3])),
+            (4, HashSet::from([0, 1, 2, 4])),
+            (5, HashSet::from([0, 1, 2, 5])),
+        ]);
+
+        assert_eq!(dominators, expected);
+    }
 }
