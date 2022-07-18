@@ -189,6 +189,8 @@ impl ControlFlowGraph {
             open_set.push_back(*pred);
         }
 
+        closed_set.insert(block_id); // current block is never its own immediate dominator
+
         while !open_set.is_empty() {
             let next = open_set.pop_front().unwrap();
             if block_dominators.contains(&next) {
