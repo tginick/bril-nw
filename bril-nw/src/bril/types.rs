@@ -19,14 +19,14 @@ pub struct FunctionArg {
     pub arg_type: Type,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Type {
     Int,
     Bool,
     Unit,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Value {
     Int(i32),
     Bool(bool),
@@ -42,6 +42,7 @@ pub enum OpCode {
     Jump,
     Branch,
     Ret,
+    Phi,
 }
 
 #[derive(Debug)]
@@ -92,6 +93,7 @@ impl TryFrom<&str> for OpCode {
             "br" => Ok(OpCode::Branch),
             "ret" => Ok(OpCode::Ret),
             "print" => Ok(OpCode::Print),
+            "phi" => Ok(OpCode::Phi),
             _ => Err(()),
         }
     }
@@ -108,6 +110,7 @@ impl Display for OpCode {
             OpCode::Branch => write!(f, "br"),
             OpCode::Ret => write!(f, "ret"),
             OpCode::Print => write!(f, "print"),
+            OpCode::Phi => write!(f, "phi"),
         }
     }
 }
@@ -206,10 +209,8 @@ impl Instruction {
 
     pub fn is_label(&self) -> bool {
         match self {
-            Instruction::Const(_) => false,
-            Instruction::Value(_) => false,
-            Instruction::Effect(_) => false,
             Instruction::Label(_) => true,
+            _ => false,
         }
     }
 

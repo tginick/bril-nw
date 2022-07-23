@@ -150,6 +150,15 @@ impl FunctionBlocks {
         Some(&self.blocks[*idx.unwrap()])
     }
 
+    pub fn get_mut_block_by_id(&mut self, id: usize) -> Option<&mut BasicBlock> {
+        let idx = self.block_id_to_idx.get(&id);
+        if let None = idx {
+            return None;
+        }
+
+        Some(&mut self.blocks[*idx.unwrap()])
+    }
+
     pub fn get_args(&self) -> &Vec<Rc<FunctionArg>> {
         &self.args
     }
