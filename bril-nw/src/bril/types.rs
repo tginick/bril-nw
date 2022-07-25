@@ -1,4 +1,4 @@
-use std::{fmt::Display, rc::Rc};
+use std::{cell::RefCell, fmt::Display, rc::Rc};
 
 #[derive(Debug)]
 pub struct Program {
@@ -45,7 +45,7 @@ pub enum OpCode {
     Phi,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ConstInstruction {
     pub op: OpCode,
     pub dest: String,
@@ -53,7 +53,7 @@ pub struct ConstInstruction {
     pub value: Value,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ValueInstruction {
     pub op: OpCode,
     pub dest: String,
@@ -63,7 +63,7 @@ pub struct ValueInstruction {
     pub labels: Vec<String>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 
 pub struct EffectInstruction {
     pub op: OpCode,
@@ -72,13 +72,16 @@ pub struct EffectInstruction {
     pub labels: Vec<String>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Instruction {
     Const(ConstInstruction),
     Value(ValueInstruction),
     Effect(EffectInstruction),
     Label(String),
 }
+
+#[derive(Debug)]
+pub struct InstructionScaffold(pub Rc<RefCell<Instruction>>);
 
 impl TryFrom<&str> for OpCode {
     type Error = ();
@@ -149,6 +152,19 @@ impl Function {
 impl FunctionArg {
     pub fn new(name: String, arg_type: Type) -> Rc<Self> {
         Rc::new(FunctionArg { name, arg_type })
+    }
+}
+
+impl From<&Rc<Instruction>> for InstructionScaffold {
+    fn from(instr: &Rc<Instruction>) -> Self {
+        let r = instr.as_ref().clone();
+        InstructionScaffold(Rc::new(RefCell::new(r)))
+    }
+}
+
+impl AsRef<Rc<RefCell<Instruction>>> for InstructionScaffold {
+    fn as_ref(&self) -> &Rc<RefCell<Instruction>> {
+        &self.0
     }
 }
 
