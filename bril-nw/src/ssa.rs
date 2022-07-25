@@ -117,7 +117,10 @@ impl<'a> SSABuilder<'a> {
 
     // this function should only be called from rename_vars
     fn rename_vars_rec(&mut self, block_id: usize) {
-
+        let mut block = self.blocks.get_mut_block_by_id(block_id).unwrap();
+        for instr in &mut block.instrs {
+            
+        }
     }
 }
 
