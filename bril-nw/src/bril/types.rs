@@ -309,6 +309,14 @@ impl Instruction {
         }
     }
 
+    pub fn set_dest(&mut self, new_dest: String) {
+        match self {
+            Instruction::Const(c) => c.dest = new_dest,
+            Instruction::Value(v) => v.dest = new_dest,
+            _ => (),
+        }
+    }
+
     pub fn get_args_copy(&self) -> Vec<String> {
         match self {
             Instruction::Value(v) => v.args.clone(),

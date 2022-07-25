@@ -1,10 +1,19 @@
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::{
+    borrow::BorrowMut,
+    collections::{HashMap, HashSet, VecDeque},
+    rc::Rc,
+};
 
 use crate::{
     basicblock::FunctionBlocks,
     bril::types::{Instruction, InstructionScaffold, OpCode, Type},
     cfg::{graph::DominatorTree, ControlFlowGraph},
 };
+
+struct SSAStack {
+    stack: Vec<String>,
+    next_name_id: usize,
+}
 
 struct SSABuilder<'a> {
     cfg: &'a ControlFlowGraph,
@@ -13,7 +22,40 @@ struct SSABuilder<'a> {
     all_vars: HashMap<String, HashSet<(usize, Type)>>,
     staged_phi_nodes: HashMap<usize, HashMap<String, InstructionScaffold>>,
 
-    rename_vars_stacks: HashMap<String, Vec<String>>, // for each var, have a stack of renamed vars
+    rename_vars_stacks: HashMap<String, SSAStack>, // for each var, have a stack of renamed vars
+
+    // mostly for dev/debug purposes. vec of (block id, var name that couldn't be renamed)
+    rename_failures: Vec<(usize, String)>,
+}
+
+impl SSAStack {
+    pub fn new() -> Self {
+        SSAStack {
+            stack: Vec::new(),
+            next_name_id: 0,
+        }
+    }
+
+    pub fn peek(&self) -> Option<&String> {
+        if !self.is_empty() {
+            Some(&self.stack[self.stack.len() - 1])
+        } else {
+            None
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.stack.len() > 0
+    }
+
+    pub fn create_new_name(&mut self, old_name: &str) -> String {
+        let result = format!("{}.{}", old_name, self.next_name_id);
+        self.next_name_id += 1;
+
+        self.stack.push(result.clone());
+
+        result
+    }
 }
 
 impl<'a> SSABuilder<'a> {
@@ -30,6 +72,7 @@ impl<'a> SSABuilder<'a> {
             staged_phi_nodes: HashMap::new(),
 
             rename_vars_stacks: HashMap::new(),
+            rename_failures: Vec::new(),
         };
 
         let all_vars = ssa_builder.find_all_vars();
@@ -98,7 +141,10 @@ impl<'a> SSABuilder<'a> {
                         vec![],
                     );
 
-                    staged_phi_nodes.get_mut(&dom_frontier_block_id).unwrap().insert(var.clone(), (&phi).into());
+                    staged_phi_nodes
+                        .get_mut(&dom_frontier_block_id)
+                        .unwrap()
+                        .insert(var.clone(), (&phi).into());
 
                     block_ids_declaring_var.insert((dom_frontier_block_id, var_type));
 
@@ -117,9 +163,70 @@ impl<'a> SSABuilder<'a> {
 
     // this function should only be called from rename_vars
     fn rename_vars_rec(&mut self, block_id: usize) {
-        let mut block = self.blocks.get_mut_block_by_id(block_id).unwrap();
+        let block = self.blocks.get_mut_block_by_id(block_id).unwrap();
+        let mut num_names_created: HashMap<String, usize> = HashMap::new();
+
         for instr in &mut block.instrs {
-            
+            let mut new_instr = instr.as_ref().clone();
+            let maybe_new_instr_args = new_instr.get_args_mut();
+            if let Some(new_instr_args) = maybe_new_instr_args {
+                for arg in new_instr_args {
+                    let arg_name_stack = self
+                        .rename_vars_stacks
+                        .entry(arg.clone())
+                        .or_insert(SSAStack::new());
+
+                    if arg_name_stack.is_empty() {
+                        self.rename_failures.push((block_id, arg.clone()));
+                        break;
+                    }
+
+                    *arg = arg_name_stack.peek().unwrap().clone();
+                }
+            }
+
+            let maybe_old_dest = new_instr.get_dest();
+            if let Some(old_dest) = maybe_old_dest {
+                let arg_name_stack = self
+                    .rename_vars_stacks
+                    .entry(old_dest.to_string())
+                    .or_insert(SSAStack::new());
+
+                let new_dest = arg_name_stack.create_new_name(old_dest);
+
+                let num_names_created_for_var =
+                    num_names_created.entry(old_dest.to_string()).or_insert(0);
+                *num_names_created_for_var += 1;
+
+                new_instr.set_dest(new_dest);
+            }
+
+            *instr = Rc::new(new_instr);
+        }
+
+        for successor_id in self.cfg.successors.get(&block_id).unwrap_or(&Vec::new()) {
+            for (var_name, successor_phi_node) in self
+                .staged_phi_nodes
+                .get(successor_id)
+                .unwrap_or(&HashMap::new())
+            {
+                let instr = (*successor_phi_node.0).borrow_mut();
+
+                let arg_name_stack = self
+                    .rename_vars_stacks
+                    .entry(var_name.clone())
+                    .or_insert(SSAStack::new());
+            }
+        }
+
+        for dominated_id in self.dom_tree.get(&block_id).unwrap_or(&HashSet::new()) {
+            self.rename_vars_rec(*dominated_id);
+        }
+
+        for (var_name, num_names_created_for_var) in num_names_created {
+            let stack = &mut self.rename_vars_stacks.get_mut(&var_name).unwrap().stack;
+            let new_stack_len = stack.len().saturating_sub(num_names_created_for_var);
+            stack.truncate(new_stack_len);
         }
     }
 }
