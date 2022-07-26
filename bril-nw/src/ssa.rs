@@ -44,7 +44,7 @@ impl SSAStack {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.stack.len() > 0
+        self.stack.len() == 0
     }
 
     pub fn create_new_name(&mut self, old_name: &str) -> String {
