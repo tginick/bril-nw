@@ -346,7 +346,7 @@ mod tests {
                 (1, vec![2, 3, 5]),
                 (2, vec![4]),
                 (3, vec![4]),
-                (5, vec![1]),
+                (4, vec![1]),
             ]),
             predecessors: HashMap::from([
                 (1, vec![0, 4]),
