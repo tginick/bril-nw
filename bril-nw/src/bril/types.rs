@@ -127,6 +127,16 @@ impl Display for Value {
     }
 }
 
+impl Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Type::Bool => write!(f, "bool"),
+            Type::Int => write!(f, "int"),
+            Type::Unit => write!(f, "()"),
+        }
+    }
+}
+
 impl Program {
     pub fn new(functions: Vec<Rc<Function>>) -> Self {
         Program { functions }
@@ -162,9 +172,55 @@ impl From<&Rc<Instruction>> for InstructionScaffold {
     }
 }
 
+impl From<&InstructionScaffold> for Rc<Instruction> {
+    fn from(i: &InstructionScaffold) -> Self {
+        let instr = (*i.0).borrow().clone();
+        Rc::new(instr)
+    }
+}
+
 impl AsRef<Rc<RefCell<Instruction>>> for InstructionScaffold {
     fn as_ref(&self) -> &Rc<RefCell<Instruction>> {
         &self.0
+    }
+}
+
+impl Display for Instruction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Instruction::Const(c) => writeln!(
+                f,
+                "    {}: {} = {} {}",
+                &c.dest, c.instr_type, c.op, c.value
+            ),
+            Instruction::Effect(e) => writeln!(
+                f,
+                "    {} {} {} {}",
+                e.op,
+                e.args.join(" "),
+                e.labels
+                    .iter()
+                    .map(|s| format!(".{}", s))
+                    .collect::<Vec<String>>()
+                    .join(" "),
+                e.funcs.join(" ")
+            ),
+            Instruction::Value(v) => writeln!(
+                f,
+                "    {}: {} = {} {} {} {}",
+                &v.dest,
+                v.instr_type,
+                v.op,
+                v.args.join(" "),
+                v.labels
+                    .iter()
+                    .map(|s| format!(".{}", s))
+                    .collect::<Vec<String>>()
+                    .join(" "),
+                v.funcs.join(" ")
+            ),
+            Instruction::Label(l) => writeln!(f, ".{}:", l),
+        }
     }
 }
 

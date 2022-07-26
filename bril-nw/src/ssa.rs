@@ -31,7 +31,7 @@ impl SSAStack {
     pub fn new() -> Self {
         SSAStack {
             stack: Vec::new(),
-            next_name_id: 0,
+            next_name_id: 1,
         }
     }
 
@@ -84,6 +84,7 @@ impl<'a> SSABuilder<'a> {
     pub fn convert_to_ssa_form(&mut self) {
         self.insert_phi_nodes();
         self.rename_vars();
+        self.finalize_phi_nodes();
     }
 
     fn find_all_vars(&self) -> HashMap<String, HashSet<(usize, Type)>> {
@@ -109,6 +110,9 @@ impl<'a> SSABuilder<'a> {
         let mut staged_phi_nodes: HashMap<usize, HashMap<String, InstructionScaffold>> =
             HashMap::new();
 
+        println!("cfg: {:?}", &self.cfg);
+        println!("domtree: {:?}", &self.dom_tree);
+
         for (var, block_ids_declaring_var) in self.all_vars.iter_mut() {
             let mut phi_insertion_candidate_blocks = VecDeque::from(
                 block_ids_declaring_var
@@ -120,6 +124,7 @@ impl<'a> SSABuilder<'a> {
             while !phi_insertion_candidate_blocks.is_empty() {
                 let (block_id, var_type) = phi_insertion_candidate_blocks.pop_front().unwrap();
                 let dom_frontier = self.cfg.get_dominance_frontier(self.dom_tree, block_id);
+                println!("Dom frontier for block {} is {:?}", block_id, &dom_frontier);
                 for dom_frontier_block_id in dom_frontier {
                     // if we already added a phi node for this var into this block, don't do so again
                     if staged_phi_nodes
@@ -128,6 +133,10 @@ impl<'a> SSABuilder<'a> {
                         .get(var)
                         .map_or(false, |_| true)
                     {
+                        println!(
+                            "Already added phi for var {} in block {}",
+                            &var, dom_frontier_block_id
+                        );
                         continue;
                     }
 
@@ -149,6 +158,11 @@ impl<'a> SSABuilder<'a> {
 
                     // this dom frontier block now declares v so we need to add it to the queue
                     phi_insertion_candidate_blocks.push_back((dom_frontier_block_id, var_type));
+
+                    println!(
+                        "Add phi for var {} to block {}",
+                        &var, dom_frontier_block_id
+                    );
                 }
             }
         }
@@ -255,6 +269,24 @@ impl<'a> SSABuilder<'a> {
             stack.truncate(new_stack_len);
         }
     }
+
+    fn finalize_phi_nodes(&mut self) {
+        // now that all the phi nodes have been properly created, add them to the basic blocks
+        println!("{} blocks with phi nodes", self.staged_phi_nodes.len());
+        for (block_id, phi_nodes) in &self.staged_phi_nodes {
+            let block = self.blocks.get_mut_block_by_id(*block_id).unwrap();
+
+            let mut combined_arr = phi_nodes
+                .values()
+                .map(|i| i.into())
+                .collect::<Vec<Rc<Instruction>>>();
+            println!("block: {} has {} phi nodes", block_id, combined_arr.len());
+
+            combined_arr.append(&mut block.instrs);
+
+            block.instrs = combined_arr;
+        }
+    }
 }
 
 pub fn convert_to_ssa_form(
@@ -313,5 +345,9 @@ mod tests {
         let dom_tree = cfg.create_dominator_tree(cfg.find_dominators());
 
         super::convert_to_ssa_form(&cfg, &dom_tree, &mut blocks);
+
+        println!("{}", blocks);
+
+        todo!();
     }
 }

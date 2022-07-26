@@ -1,6 +1,7 @@
 use std::{
     cell::RefCell,
     collections::{HashMap, HashSet},
+    fmt,
     rc::Rc,
 };
 
@@ -169,5 +170,37 @@ impl FunctionBlocks {
 
     pub fn get_block_name(&self, id: usize) -> Option<String> {
         self.get_block_by_id(id).map(|b| b.get_name())
+    }
+}
+
+impl fmt::Display for FunctionBlocks {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "@{}(", self.get_name())?;
+        for (i, arg) in self.args.iter().enumerate() {
+            write!(
+                f,
+                "{}: {}{}",
+                &arg.name,
+                arg.arg_type,
+                if i < self.args.len() - 1 { ", " } else { ") {\n" }
+            )?;
+        }
+
+        for block in &self.blocks {
+            writeln!(f, "#{}", block.name.borrow())?;
+            write!(f, "{}", block)?;
+        }
+
+        Ok(())
+    }
+}
+
+impl fmt::Display for BasicBlock {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for instr in &self.instrs {
+            write!(f, "{}", instr)?;
+        }
+
+        Ok(())
     }
 }
