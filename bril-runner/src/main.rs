@@ -52,12 +52,12 @@ fn main() {
             println!("// cfg: {}", cfg);
         }
 
-        if cmd_line.convert_to_ssa {
-            let dom_tree = cfg.create_dominator_tree(cfg.find_dominators());
-            if cmd_line.display_cfg {
-                println!("// domtree: {:?}", dom_tree);
-            }
+        let dom_tree = cfg.create_dominator_tree(cfg.find_dominators());
+        if cmd_line.display_cfg {
+            println!("// domtree: {:?}", dom_tree);
+        }
 
+        if cmd_line.convert_to_ssa {
             ssa::convert_to_ssa_form(&mut cfg, &dom_tree);
         }
 
