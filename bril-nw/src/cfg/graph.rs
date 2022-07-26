@@ -235,13 +235,13 @@ impl ControlFlowGraph {
         dominator_tree: &DominatorTree,
         block_id: usize,
     ) -> HashSet<usize> {
-        let dominated_nodes = dominator_tree.get(&block_id);
+        let no_dominated_nodes = HashSet::new();
+        let immediately_dominated_nodes =
+            dominator_tree.get(&block_id).unwrap_or(&no_dominated_nodes);
 
-        if let None = dominated_nodes {
-            return HashSet::new();
-        }
-
-        let dominated_nodes = dominated_nodes.unwrap();
+        let mut dominated_nodes: HashSet<usize> =
+            immediately_dominated_nodes.iter().copied().collect();
+        dominated_nodes.insert(block_id);
 
         // look through all the successors of dominated nodes, eliminating those that are also in dominated_nodes
         let mut all_successors_of_dominated: HashSet<usize> = HashSet::new();
@@ -255,7 +255,7 @@ impl ControlFlowGraph {
         }
 
         all_successors_of_dominated
-            .difference(dominated_nodes)
+            .difference(&dominated_nodes)
             .copied()
             .collect()
     }
@@ -359,6 +359,14 @@ mod tests {
         }
     }
 
+    fn get_test_cfg_3() -> ControlFlowGraph {
+        ControlFlowGraph {
+            predecessors: HashMap::from([(1, vec![0]), (2, vec![0]), (3, vec![1, 2])]),
+            successors: HashMap::from([(0, vec![1, 2]), (1, vec![3]), (2, vec![3])]),
+            all_block_ids: vec![0, 1, 2, 3],
+        }
+    }
+
     #[test]
     fn test_find_dominators_1() {
         let cfg = get_test_cfg_1();
@@ -434,5 +442,30 @@ mod tests {
             HashMap::from([(0, HashSet::from([1])), (1, HashSet::from([2, 3, 4, 5]))]);
 
         assert_eq!(dominator_tree, expected);
+    }
+
+    #[test]
+    fn test_dominance_frontier_1() {
+        let cfg = get_test_cfg_3();
+
+        let dominators = cfg.find_dominators();
+        let dominator_tree = cfg.create_dominator_tree(dominators);
+
+        // in this cfg, the root node has no frontier as it dominates all nodes in the graph
+        assert_eq!(
+            cfg.get_dominance_frontier(&dominator_tree, 0),
+            HashSet::new()
+        );
+
+        // 3's predecessors are 1 and 2, which means 1 and 2 do not dominate 3.
+        // 3 is in 1 and 2's dominance frontier
+        assert_eq!(
+            cfg.get_dominance_frontier(&dominator_tree, 1),
+            HashSet::from([3])
+        );
+        assert_eq!(
+            cfg.get_dominance_frontier(&dominator_tree, 2),
+            HashSet::from([3])
+        );
     }
 }

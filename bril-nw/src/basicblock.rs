@@ -182,7 +182,11 @@ impl fmt::Display for FunctionBlocks {
                 "{}: {}{}",
                 &arg.name,
                 arg.arg_type,
-                if i < self.args.len() - 1 { ", " } else { ") {\n" }
+                if i < self.args.len() - 1 {
+                    ", "
+                } else {
+                    ") {\n"
+                }
             )?;
         }
 

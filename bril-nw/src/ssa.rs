@@ -110,9 +110,6 @@ impl<'a> SSABuilder<'a> {
         let mut staged_phi_nodes: HashMap<usize, HashMap<String, InstructionScaffold>> =
             HashMap::new();
 
-        println!("cfg: {:?}", &self.cfg);
-        println!("domtree: {:?}", &self.dom_tree);
-
         for (var, block_ids_declaring_var) in self.all_vars.iter_mut() {
             let mut phi_insertion_candidate_blocks = VecDeque::from(
                 block_ids_declaring_var
@@ -124,7 +121,6 @@ impl<'a> SSABuilder<'a> {
             while !phi_insertion_candidate_blocks.is_empty() {
                 let (block_id, var_type) = phi_insertion_candidate_blocks.pop_front().unwrap();
                 let dom_frontier = self.cfg.get_dominance_frontier(self.dom_tree, block_id);
-                println!("Dom frontier for block {} is {:?}", block_id, &dom_frontier);
                 for dom_frontier_block_id in dom_frontier {
                     // if we already added a phi node for this var into this block, don't do so again
                     if staged_phi_nodes
@@ -133,10 +129,6 @@ impl<'a> SSABuilder<'a> {
                         .get(var)
                         .map_or(false, |_| true)
                     {
-                        println!(
-                            "Already added phi for var {} in block {}",
-                            &var, dom_frontier_block_id
-                        );
                         continue;
                     }
 
@@ -158,11 +150,6 @@ impl<'a> SSABuilder<'a> {
 
                     // this dom frontier block now declares v so we need to add it to the queue
                     phi_insertion_candidate_blocks.push_back((dom_frontier_block_id, var_type));
-
-                    println!(
-                        "Add phi for var {} to block {}",
-                        &var, dom_frontier_block_id
-                    );
                 }
             }
         }
@@ -272,17 +259,33 @@ impl<'a> SSABuilder<'a> {
 
     fn finalize_phi_nodes(&mut self) {
         // now that all the phi nodes have been properly created, add them to the basic blocks
-        println!("{} blocks with phi nodes", self.staged_phi_nodes.len());
         for (block_id, phi_nodes) in &self.staged_phi_nodes {
             let block = self.blocks.get_mut_block_by_id(*block_id).unwrap();
 
-            let mut combined_arr = phi_nodes
+            let label = if block.instrs.get(0).map_or(false, |i| i.is_label()) {
+                // if the first instr in the block is a label
+                Some(block.instrs[0].clone())
+            } else {
+                None
+            };
+
+            let mut phi_arr = phi_nodes
                 .values()
                 .map(|i| i.into())
                 .collect::<Vec<Rc<Instruction>>>();
-            println!("block: {} has {} phi nodes", block_id, combined_arr.len());
 
-            combined_arr.append(&mut block.instrs);
+            let combined_arr = if label.is_some() {
+                let mut r = vec![label.unwrap()];
+                r.append(&mut phi_arr);
+                r.extend_from_slice(&block.instrs[1..]);
+                r
+            } else {
+                let mut r = vec![];
+                r.append(&mut phi_arr);
+                r.extend_from_slice(&block.instrs);
+
+                r
+            };
 
             block.instrs = combined_arr;
         }
