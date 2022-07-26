@@ -1,8 +1,16 @@
-use std::rc::Rc;
+use std::{collections::HashSet, rc::Rc};
 
 use json::JsonValue;
 
 use super::types::{Function, FunctionArg, Instruction, OpCode, Program, Type, Value};
+
+lazy_static! {
+    static ref VALUE_INSTS: HashSet<OpCode> =
+        HashSet::from([OpCode::Id, OpCode::Add, OpCode::Mul, OpCode::Phi]);
+    static ref EFFECT_INSTS: HashSet<OpCode> =
+        HashSet::from([OpCode::Print, OpCode::Ret, OpCode::Branch, OpCode::Jump]);
+    static ref CONST_INSTS: HashSet<OpCode> = HashSet::from([OpCode::Const]);
+}
 
 #[derive(Debug)]
 pub enum BrilLoadError {
@@ -132,14 +140,15 @@ fn load_bril_instr(instr_v: &JsonValue) -> Result<Rc<Instruction>, BrilLoadError
 
     let real_op = real_op.unwrap();
 
-    match real_op {
-        OpCode::Const => load_bril_const_instr(real_op, instr_v),
-        OpCode::Print => load_bril_effect_instr(real_op, instr_v),
-        OpCode::Jump => load_bril_effect_instr(real_op, instr_v),
-        OpCode::Ret => load_bril_effect_instr(real_op, instr_v),
-        OpCode::Add => load_bril_value_instr(real_op, instr_v),
-        _ => Err(BrilLoadError::UnrecognizedInstr(op_str.to_string())),
-    }
+    return if CONST_INSTS.contains(&real_op) {
+        load_bril_const_instr(real_op, instr_v)
+    } else if EFFECT_INSTS.contains(&real_op) {
+        load_bril_effect_instr(real_op, instr_v)
+    } else if VALUE_INSTS.contains(&real_op) {
+        load_bril_value_instr(real_op, instr_v)
+    } else {
+        Err(BrilLoadError::UnrecognizedInstr(op_str.to_string()))
+    };
 }
 
 fn load_bril_const_instr(
