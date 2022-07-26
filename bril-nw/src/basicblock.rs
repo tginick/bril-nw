@@ -195,6 +195,8 @@ impl fmt::Display for FunctionBlocks {
             write!(f, "{}", block)?;
         }
 
+        writeln!(f, "}}")?;
+
         Ok(())
     }
 }

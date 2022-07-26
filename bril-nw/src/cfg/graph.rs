@@ -1,14 +1,18 @@
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
+use std::fmt;
 
-use crate::basicblock::BasicBlock;
+use itertools::Itertools;
+
+use crate::basicblock::{BasicBlock, FunctionBlocks};
 
 const BLOCK_NAME_PFX: &'static str = "block_";
 
 #[derive(Debug)]
-pub struct ControlFlowGraph {
+pub struct ControlFlowGraph<'a> {
     pub predecessors: HashMap<usize, Vec<usize>>,
     pub successors: HashMap<usize, Vec<usize>>,
     all_block_ids: Vec<usize>,
+    blocks: &'a mut FunctionBlocks,
 }
 
 pub type Dominators = HashMap<usize, HashSet<usize>>;
@@ -17,8 +21,26 @@ pub type StrictDominators = Dominators;
 pub type ImmediateDominators = HashMap<usize, usize>;
 pub type DominatorTree = HashMap<usize, HashSet<usize>>;
 
-impl ControlFlowGraph {
-    pub fn create_from_basic_blocks(blocks: &Vec<BasicBlock>) -> Self {
+impl fmt::Display for ControlFlowGraph<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let all_block_ids = self.all_block_ids.clone();
+        let name_str = all_block_ids
+            .into_iter()
+            .map(|id| {
+                (
+                    id,
+                    self.blocks.get_block_by_id(id).unwrap().get_name().clone(),
+                )
+            })
+            .map(|(id, name)| format!("{}: {}", id, name))
+            .join(", ");
+        write!(f, "{:?} {{{}}}", self.successors, name_str)
+    }
+}
+
+impl<'a> ControlFlowGraph<'a> {
+    pub fn create_from_basic_blocks(function_blocks: &'a mut FunctionBlocks) -> Self {
+        let blocks = &function_blocks.get_blocks();
         let identifiers = identify_basic_blocks(&blocks);
         let mut predecessors: HashMap<usize, Vec<usize>> = HashMap::new();
         let mut successors: HashMap<usize, Vec<usize>> = HashMap::new();
@@ -84,7 +106,12 @@ impl ControlFlowGraph {
             predecessors,
             successors,
             all_block_ids,
+            blocks: function_blocks,
         }
+    }
+
+    pub fn get_mut_function(&mut self) -> &mut FunctionBlocks {
+        self.blocks
     }
 
     pub fn find_dominators(&self) -> Dominators {
@@ -234,14 +261,16 @@ impl ControlFlowGraph {
         &self,
         dominator_tree: &DominatorTree,
         block_id: usize,
-    ) -> HashSet<usize> {
+    ) -> BTreeSet<usize> {
         let no_dominated_nodes = HashSet::new();
         let immediately_dominated_nodes =
             dominator_tree.get(&block_id).unwrap_or(&no_dominated_nodes);
 
-        let mut dominated_nodes: HashSet<usize> =
-            immediately_dominated_nodes.iter().copied().collect();
-        dominated_nodes.insert(block_id);
+        let mut dominated_nodes: Vec<usize> = immediately_dominated_nodes.iter().copied().collect();
+        dominated_nodes.push(block_id);
+        dominated_nodes.sort();
+
+        let dominated_nodes_set = dominated_nodes.iter().copied().collect::<HashSet<usize>>();
 
         // look through all the successors of dominated nodes, eliminating those that are also in dominated_nodes
         let mut all_successors_of_dominated: HashSet<usize> = HashSet::new();
@@ -255,7 +284,7 @@ impl ControlFlowGraph {
         }
 
         all_successors_of_dominated
-            .difference(&dominated_nodes)
+            .difference(&dominated_nodes_set)
             .copied()
             .collect()
     }
@@ -313,14 +342,20 @@ fn identify_basic_blocks(blocks: &Vec<BasicBlock>) -> HashMap<String, usize> {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::{HashMap, HashSet};
+    use std::collections::{BTreeSet, HashMap, HashSet};
 
-    use crate::cfg::graph::retain_only_strict_dominators;
+    use crate::{basicblock::FunctionBlocks, cfg::graph::retain_only_strict_dominators};
 
     use super::{ControlFlowGraph, DominatorTree, ImmediateDominators};
 
-    fn get_test_cfg_1() -> ControlFlowGraph {
-        ControlFlowGraph {
+    struct GraphEdges {
+        successors: HashMap<usize, Vec<usize>>,
+        predecessors: HashMap<usize, Vec<usize>>,
+        all_block_ids: Vec<usize>,
+    }
+
+    fn get_test_cfg_edges_1() -> GraphEdges {
+        GraphEdges {
             successors: HashMap::from([
                 (0, vec![1]),
                 (1, vec![2, 3]),
@@ -339,8 +374,8 @@ mod tests {
         }
     }
 
-    fn get_test_cfg_2() -> ControlFlowGraph {
-        ControlFlowGraph {
+    fn get_test_cfg_edges_2() -> GraphEdges {
+        GraphEdges {
             successors: HashMap::from([
                 (0, vec![1]),
                 (1, vec![2, 3, 5]),
@@ -359,17 +394,36 @@ mod tests {
         }
     }
 
-    fn get_test_cfg_3() -> ControlFlowGraph {
-        ControlFlowGraph {
+    fn get_test_cfg_edges_3() -> GraphEdges {
+        GraphEdges {
             predecessors: HashMap::from([(1, vec![0]), (2, vec![0]), (3, vec![1, 2])]),
             successors: HashMap::from([(0, vec![1, 2]), (1, vec![3]), (2, vec![3])]),
             all_block_ids: vec![0, 1, 2, 3],
         }
     }
 
+    fn get_mock_function_blocks() -> FunctionBlocks {
+        FunctionBlocks::new("", vec![], vec![], HashMap::new())
+    }
+
+    fn get_mock_cfg<'a>(
+        function_blocks: &'a mut FunctionBlocks,
+        edges: GraphEdges,
+    ) -> ControlFlowGraph<'a> {
+        ControlFlowGraph {
+            predecessors: edges.predecessors,
+            successors: edges.successors,
+            all_block_ids: edges.all_block_ids,
+            blocks: function_blocks,
+        }
+    }
+
     #[test]
     fn test_find_dominators_1() {
-        let cfg = get_test_cfg_1();
+        let edges = get_test_cfg_edges_1();
+        let mut mock_blocks = get_mock_function_blocks();
+
+        let cfg = get_mock_cfg(&mut mock_blocks, edges);
 
         let dominators = cfg.find_dominators();
         let expected: HashMap<usize, HashSet<usize>> = HashMap::from([
@@ -386,7 +440,10 @@ mod tests {
 
     #[test]
     fn test_find_strict_dominators_1() {
-        let cfg = get_test_cfg_1();
+        let edges = get_test_cfg_edges_1();
+        let mut mock_blocks = get_mock_function_blocks();
+
+        let cfg = get_mock_cfg(&mut mock_blocks, edges);
 
         let dominators = cfg.find_dominators();
         let strict_dominators = retain_only_strict_dominators(dominators);
@@ -404,7 +461,10 @@ mod tests {
 
     #[test]
     fn test_find_immediate_dominators_1() {
-        let cfg = get_test_cfg_1();
+        let edges = get_test_cfg_edges_1();
+        let mut mock_blocks = get_mock_function_blocks();
+
+        let cfg = get_mock_cfg(&mut mock_blocks, edges);
 
         let dominators = cfg.find_dominators();
         let immediate_dominators =
@@ -417,7 +477,10 @@ mod tests {
 
     #[test]
     fn test_dominator_tree_1() {
-        let cfg = get_test_cfg_1();
+        let edges = get_test_cfg_edges_1();
+        let mut mock_blocks = get_mock_function_blocks();
+
+        let cfg = get_mock_cfg(&mut mock_blocks, edges);
 
         let dominators = cfg.find_dominators();
         let dominator_tree = cfg.create_dominator_tree(dominators);
@@ -433,7 +496,10 @@ mod tests {
 
     #[test]
     fn test_dominator_tree_2() {
-        let cfg = get_test_cfg_2();
+        let edges = get_test_cfg_edges_2();
+        let mut mock_blocks = get_mock_function_blocks();
+
+        let cfg = get_mock_cfg(&mut mock_blocks, edges);
 
         let dominators = cfg.find_dominators();
         let dominator_tree = cfg.create_dominator_tree(dominators);
@@ -446,7 +512,10 @@ mod tests {
 
     #[test]
     fn test_dominance_frontier_1() {
-        let cfg = get_test_cfg_3();
+        let edges = get_test_cfg_edges_3();
+        let mut mock_blocks = get_mock_function_blocks();
+
+        let cfg = get_mock_cfg(&mut mock_blocks, edges);
 
         let dominators = cfg.find_dominators();
         let dominator_tree = cfg.create_dominator_tree(dominators);
@@ -454,18 +523,18 @@ mod tests {
         // in this cfg, the root node has no frontier as it dominates all nodes in the graph
         assert_eq!(
             cfg.get_dominance_frontier(&dominator_tree, 0),
-            HashSet::new()
+            BTreeSet::new()
         );
 
         // 3's predecessors are 1 and 2, which means 1 and 2 do not dominate 3.
         // 3 is in 1 and 2's dominance frontier
         assert_eq!(
             cfg.get_dominance_frontier(&dominator_tree, 1),
-            HashSet::from([3])
+            BTreeSet::from([3])
         );
         assert_eq!(
             cfg.get_dominance_frontier(&dominator_tree, 2),
-            HashSet::from([3])
+            BTreeSet::from([3])
         );
     }
 }

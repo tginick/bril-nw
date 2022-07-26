@@ -4,20 +4,19 @@ use std::{
 };
 
 use crate::{
-    basicblock::FunctionBlocks,
     bril::types::{Instruction, InstructionScaffold, OpCode, Type},
     cfg::{graph::DominatorTree, ControlFlowGraph},
 };
 
+use itertools::Itertools;
 struct SSAStack {
     stack: Vec<String>,
     next_name_id: usize,
 }
 
 struct SSABuilder<'a> {
-    cfg: &'a ControlFlowGraph,
+    cfg: &'a mut ControlFlowGraph<'a>,
     dom_tree: &'a DominatorTree,
-    blocks: &'a mut FunctionBlocks,
     all_vars: HashMap<String, HashSet<(usize, Type)>>,
     staged_phi_nodes: HashMap<usize, HashMap<String, InstructionScaffold>>,
 
@@ -58,15 +57,10 @@ impl SSAStack {
 }
 
 impl<'a> SSABuilder<'a> {
-    pub fn new(
-        cfg: &'a ControlFlowGraph,
-        dom_tree: &'a DominatorTree,
-        blocks: &'a mut FunctionBlocks,
-    ) -> Self {
+    pub fn new(cfg: &'a mut ControlFlowGraph<'a>, dom_tree: &'a DominatorTree) -> SSABuilder<'a> {
         let mut ssa_builder = SSABuilder {
             cfg,
             dom_tree,
-            blocks,
             all_vars: HashMap::new(),
             staged_phi_nodes: HashMap::new(),
 
@@ -87,10 +81,10 @@ impl<'a> SSABuilder<'a> {
         self.finalize_phi_nodes();
     }
 
-    fn find_all_vars(&self) -> HashMap<String, HashSet<(usize, Type)>> {
+    fn find_all_vars(&mut self) -> HashMap<String, HashSet<(usize, Type)>> {
         let mut r: HashMap<String, HashSet<(usize, Type)>> = HashMap::new();
 
-        for block in self.blocks.get_blocks() {
+        for block in self.cfg.get_mut_function().get_blocks() {
             for instr in &block.instrs {
                 let maybe_dest = instr.get_dest();
                 if let Some(dest) = maybe_dest {
@@ -163,7 +157,11 @@ impl<'a> SSABuilder<'a> {
 
     // this function should only be called from rename_vars
     fn rename_vars_rec(&mut self, block_id: usize) {
-        let block = self.blocks.get_mut_block_by_id(block_id).unwrap();
+        let block = self
+            .cfg
+            .get_mut_function()
+            .get_mut_block_by_id(block_id)
+            .unwrap();
         let mut num_names_created: HashMap<String, usize> = HashMap::new();
 
         // i think phi nodes come first so we should process these first...?
@@ -224,10 +222,16 @@ impl<'a> SSABuilder<'a> {
             *instr = Rc::new(new_instr);
         }
 
-        for successor_id in self.cfg.successors.get(&block_id).unwrap_or(&Vec::new()) {
+        let successors = self
+            .cfg
+            .successors
+            .get(&block_id)
+            .unwrap_or(&Vec::new())
+            .clone();
+        for successor_id in successors {
             for (var_name, successor_phi_node) in self
                 .staged_phi_nodes
-                .get(successor_id)
+                .get(&successor_id)
                 .unwrap_or(&HashMap::new())
             {
                 let mut instr = (*successor_phi_node.0).borrow_mut();
@@ -236,7 +240,11 @@ impl<'a> SSABuilder<'a> {
                     get_or_create_arg_name_stack(&mut self.rename_vars_stacks, var_name.clone());
 
                 // TODO: means the var isn't defined so maybe a better error would be good here
-                let current_block_name = self.blocks.get_block_name(block_id).unwrap();
+                let current_block_name = self
+                    .cfg
+                    .get_mut_function()
+                    .get_block_name(block_id)
+                    .unwrap();
 
                 instr
                     .get_args_mut()
@@ -246,8 +254,18 @@ impl<'a> SSABuilder<'a> {
             }
         }
 
-        for dominated_id in self.dom_tree.get(&block_id).unwrap_or(&HashSet::new()) {
-            self.rename_vars_rec(*dominated_id);
+        // this chain seems a little excessive lol
+        let sorted_dominated_nodes = self
+            .dom_tree
+            .get(&block_id)
+            .unwrap_or(&HashSet::new())
+            .clone()
+            .into_iter()
+            .sorted()
+            .collect::<Vec<usize>>();
+
+        for dominated_id in sorted_dominated_nodes {
+            self.rename_vars_rec(dominated_id);
         }
 
         for (var_name, num_names_created_for_var) in num_names_created {
@@ -260,7 +278,11 @@ impl<'a> SSABuilder<'a> {
     fn finalize_phi_nodes(&mut self) {
         // now that all the phi nodes have been properly created, add them to the basic blocks
         for (block_id, phi_nodes) in &self.staged_phi_nodes {
-            let block = self.blocks.get_mut_block_by_id(*block_id).unwrap();
+            let block = self
+                .cfg
+                .get_mut_function()
+                .get_mut_block_by_id(*block_id)
+                .unwrap();
 
             let label = if block.instrs.get(0).map_or(false, |i| i.is_label()) {
                 // if the first instr in the block is a label
@@ -292,11 +314,7 @@ impl<'a> SSABuilder<'a> {
     }
 }
 
-pub fn convert_to_ssa_form(
-    cfg: &ControlFlowGraph,
-    dom_tree: &DominatorTree,
-    blocks: &mut FunctionBlocks,
-) {
+pub fn convert_to_ssa_form<'a>(cfg: &'a mut ControlFlowGraph<'a>, dom_tree: &'a DominatorTree) {
     /*
 
     // variable decl -> block id where it was added
@@ -305,7 +323,7 @@ pub fn convert_to_ssa_form(
     insert_phi_nodes(cfg, dom_tree, blocks, &mut all_vars, &mut added_phi_nodes);
     */
 
-    let mut ssa_builder = SSABuilder::new(cfg, dom_tree, blocks);
+    let mut ssa_builder = SSABuilder::new(cfg, dom_tree);
     ssa_builder.convert_to_ssa_form();
 }
 
@@ -344,10 +362,10 @@ mod tests {
         let main_func = program.functions[0].clone();
 
         let mut blocks = load_function_blocks(main_func);
-        let cfg = ControlFlowGraph::create_from_basic_blocks(&blocks.get_blocks());
+        let mut cfg = ControlFlowGraph::create_from_basic_blocks(&mut blocks);
         let dom_tree = cfg.create_dominator_tree(cfg.find_dominators());
 
-        super::convert_to_ssa_form(&cfg, &dom_tree, &mut blocks);
+        super::convert_to_ssa_form(&mut cfg, &dom_tree);
 
         println!("{}", blocks);
 

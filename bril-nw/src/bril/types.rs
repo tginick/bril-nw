@@ -1,4 +1,4 @@
-use std::{cell::RefCell, fmt::Display, rc::Rc};
+use std::{cell::RefCell, fmt, rc::Rc};
 
 #[derive(Debug)]
 pub struct Program {
@@ -102,7 +102,7 @@ impl TryFrom<&str> for OpCode {
     }
 }
 
-impl Display for OpCode {
+impl fmt::Display for OpCode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             OpCode::Id => write!(f, "id"),
@@ -118,7 +118,7 @@ impl Display for OpCode {
     }
 }
 
-impl Display for Value {
+impl fmt::Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Value::Int(i) => write!(f, "{}", i),
@@ -127,7 +127,7 @@ impl Display for Value {
     }
 }
 
-impl Display for Type {
+impl fmt::Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Type::Bool => write!(f, "bool"),
@@ -185,7 +185,7 @@ impl AsRef<Rc<RefCell<Instruction>>> for InstructionScaffold {
     }
 }
 
-impl Display for Instruction {
+impl fmt::Display for Instruction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Instruction::Const(c) => writeln!(
