@@ -166,4 +166,8 @@ impl FunctionBlocks {
     pub fn get_name(&self) -> &String {
         &self.name
     }
+
+    pub fn get_block_name(&self, id: usize) -> Option<String> {
+        self.get_block_by_id(id).map(|b| b.get_name())
+    }
 }

@@ -371,6 +371,14 @@ impl Instruction {
             _ => None,
         }
     }
+
+    pub fn get_labels_mut(&mut self) -> Option<&mut Vec<String>> {
+        match self {
+            Instruction::Value(v) => Some(&mut v.labels),
+            Instruction::Effect(e) => Some(&mut e.labels),
+            _ => None,
+        }
+    }
 }
 
 fn get_jump_target_from_effect(e: &EffectInstruction) -> Vec<String> {

@@ -1,5 +1,4 @@
 use std::{
-    borrow::BorrowMut,
     collections::{HashMap, HashSet, VecDeque},
     rc::Rc,
 };
@@ -166,15 +165,35 @@ impl<'a> SSABuilder<'a> {
         let block = self.blocks.get_mut_block_by_id(block_id).unwrap();
         let mut num_names_created: HashMap<String, usize> = HashMap::new();
 
+        // i think phi nodes come first so we should process these first...?
+        // anyway phi nodes are assignments, so we need to apply ssa to them
+        // we only care about the destination though
+        // args will be set during the rename recursive process
+        for (staged_phi_var, staged_phi_instr) in self
+            .staged_phi_nodes
+            .get_mut(&block_id)
+            .unwrap_or(&mut HashMap::new())
+        {
+            let arg_name_stack =
+                get_or_create_arg_name_stack(&mut self.rename_vars_stacks, staged_phi_var.clone());
+
+            let new_dest = arg_name_stack.create_new_name(&staged_phi_var);
+            let num_names_created_for_var = num_names_created
+                .entry(staged_phi_var.to_string())
+                .or_insert(0);
+            *num_names_created_for_var += 1;
+
+            (*staged_phi_instr.0).borrow_mut().set_dest(new_dest);
+        }
+
+        // do the same as phi nodes above while also renaming args
         for instr in &mut block.instrs {
             let mut new_instr = instr.as_ref().clone();
             let maybe_new_instr_args = new_instr.get_args_mut();
             if let Some(new_instr_args) = maybe_new_instr_args {
                 for arg in new_instr_args {
-                    let arg_name_stack = self
-                        .rename_vars_stacks
-                        .entry(arg.clone())
-                        .or_insert(SSAStack::new());
+                    let arg_name_stack =
+                        get_or_create_arg_name_stack(&mut self.rename_vars_stacks, arg.clone());
 
                     if arg_name_stack.is_empty() {
                         self.rename_failures.push((block_id, arg.clone()));
@@ -187,10 +206,10 @@ impl<'a> SSABuilder<'a> {
 
             let maybe_old_dest = new_instr.get_dest();
             if let Some(old_dest) = maybe_old_dest {
-                let arg_name_stack = self
-                    .rename_vars_stacks
-                    .entry(old_dest.to_string())
-                    .or_insert(SSAStack::new());
+                let arg_name_stack = get_or_create_arg_name_stack(
+                    &mut self.rename_vars_stacks,
+                    old_dest.to_string(),
+                );
 
                 let new_dest = arg_name_stack.create_new_name(old_dest);
 
@@ -210,12 +229,19 @@ impl<'a> SSABuilder<'a> {
                 .get(successor_id)
                 .unwrap_or(&HashMap::new())
             {
-                let instr = (*successor_phi_node.0).borrow_mut();
+                let mut instr = (*successor_phi_node.0).borrow_mut();
 
-                let arg_name_stack = self
-                    .rename_vars_stacks
-                    .entry(var_name.clone())
-                    .or_insert(SSAStack::new());
+                let arg_name_stack =
+                    get_or_create_arg_name_stack(&mut self.rename_vars_stacks, var_name.clone());
+
+                // TODO: means the var isn't defined so maybe a better error would be good here
+                let current_block_name = self.blocks.get_block_name(block_id).unwrap();
+
+                instr
+                    .get_args_mut()
+                    .unwrap()
+                    .push(arg_name_stack.peek().unwrap().clone());
+                instr.get_labels_mut().unwrap().push(current_block_name);
             }
         }
 
@@ -246,4 +272,13 @@ pub fn convert_to_ssa_form(
 
     let mut ssa_builder = SSABuilder::new(cfg, dom_tree, blocks);
     ssa_builder.convert_to_ssa_form();
+}
+
+fn get_or_create_arg_name_stack(
+    rename_var_stacks: &mut HashMap<String, SSAStack>,
+    arg_name: String,
+) -> &mut SSAStack {
+    rename_var_stacks
+        .entry(arg_name.clone())
+        .or_insert(SSAStack::new())
 }
