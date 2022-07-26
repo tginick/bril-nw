@@ -282,3 +282,36 @@ fn get_or_create_arg_name_stack(
         .entry(arg_name.clone())
         .or_insert(SSAStack::new())
 }
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        fs,
+        path::{Path, PathBuf},
+    };
+
+    use crate::{basicblock::load_function_blocks, bril::loader::load_bril, cfg::ControlFlowGraph};
+
+    fn load_bril_from_test_dir(json_file: &str) -> String {
+        let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        d.push("resources/test/ssa");
+
+        d.push(json_file);
+        let p = Path::new(d.to_str().unwrap());
+        fs::read_to_string(p).unwrap()
+    }
+
+    #[test]
+    fn test_if() {
+        let contents = load_bril_from_test_dir("if_orig.json");
+
+        let program = load_bril(&contents).unwrap();
+        let main_func = program.functions[0].clone();
+
+        let mut blocks = load_function_blocks(main_func);
+        let cfg = ControlFlowGraph::create_from_basic_blocks(&blocks.get_blocks());
+        let dom_tree = cfg.create_dominator_tree(cfg.find_dominators());
+
+        super::convert_to_ssa_form(&cfg, &dom_tree, &mut blocks);
+    }
+}
