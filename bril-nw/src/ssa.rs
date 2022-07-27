@@ -3,12 +3,13 @@ use std::{
     rc::Rc,
 };
 
+use itertools::Itertools;
+
 use crate::{
     bril::types::{Instruction, InstructionScaffold, OpCode, Type},
     cfg::{graph::DominatorTree, ControlFlowGraph},
 };
 
-use itertools::Itertools;
 struct SSAStack {
     stack: Vec<String>,
     next_name_id: usize,
@@ -257,6 +258,7 @@ impl<'a> SSABuilder<'a> {
         // this chain seems a little excessive lol
         let sorted_dominated_nodes = self
             .dom_tree
+            .0
             .get(&block_id)
             .unwrap_or(&HashSet::new())
             .clone()
@@ -315,14 +317,6 @@ impl<'a> SSABuilder<'a> {
 }
 
 pub fn convert_to_ssa_form<'a>(cfg: &'a mut ControlFlowGraph<'a>, dom_tree: &'a DominatorTree) {
-    /*
-
-    // variable decl -> block id where it was added
-    let mut added_phi_nodes: HashMap<String, HashSet<usize>> = HashMap::new();
-
-    insert_phi_nodes(cfg, dom_tree, blocks, &mut all_vars, &mut added_phi_nodes);
-    */
-
     let mut ssa_builder = SSABuilder::new(cfg, dom_tree);
     ssa_builder.convert_to_ssa_form();
 }
@@ -367,7 +361,8 @@ mod tests {
 
         let mut blocks = maybe_blocks.unwrap();
         let mut cfg = ControlFlowGraph::create_from_basic_blocks(&mut blocks);
-        let dom_tree = cfg.create_dominator_tree(cfg.find_dominators());
+        let dominators = cfg.find_dominators();
+        let dom_tree = cfg.create_dominator_tree(&dominators);
 
         super::convert_to_ssa_form(&mut cfg, &dom_tree);
 

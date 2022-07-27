@@ -59,9 +59,10 @@ fn main() {
             println!("// cfg: {}", cfg);
         }
 
-        let dom_tree = cfg.create_dominator_tree(cfg.find_dominators());
+        let dominators = cfg.find_dominators();
+        let dom_tree = cfg.create_dominator_tree(&dominators);
         if cmd_line.display_cfg {
-            println!("// domtree: {:?}", dom_tree);
+            println!("// domtree: {:?}", dom_tree.0);
         }
 
         if cmd_line.convert_to_ssa {

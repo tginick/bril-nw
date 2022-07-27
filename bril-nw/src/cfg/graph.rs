@@ -17,7 +17,7 @@ pub type Dominators = HashMap<usize, HashSet<usize>>;
 pub type StrictDominators = Dominators;
 
 pub type ImmediateDominators = HashMap<usize, usize>;
-pub type DominatorTree = HashMap<usize, HashSet<usize>>;
+pub struct DominatorTree(pub HashMap<usize, HashSet<usize>>);
 
 impl fmt::Display for ControlFlowGraph<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -235,11 +235,11 @@ impl<'a> ControlFlowGraph<'a> {
         0
     }
 
-    pub fn create_dominator_tree(&self, dominators: Dominators) -> DominatorTree {
+    pub fn create_dominator_tree(&self, dominators: &Dominators) -> DominatorTree {
         let strict_dominators = retain_only_strict_dominators(dominators);
         let immediate_dominators = self.find_immediate_dominators(&strict_dominators);
 
-        let mut result = DominatorTree::new();
+        let mut result: HashMap<usize, HashSet<usize>> = HashMap::new();
 
         for block_id in immediate_dominators.keys() {
             let immediate_dominator = immediate_dominators.get(block_id).unwrap();
@@ -253,7 +253,7 @@ impl<'a> ControlFlowGraph<'a> {
             }
         }
 
-        result
+        DominatorTree(result)
     }
 
     pub fn get_dominance_frontier(
@@ -261,15 +261,10 @@ impl<'a> ControlFlowGraph<'a> {
         dominator_tree: &DominatorTree,
         block_id: usize,
     ) -> BTreeSet<usize> {
-        let no_dominated_nodes = HashSet::new();
-        let immediately_dominated_nodes =
-            dominator_tree.get(&block_id).unwrap_or(&no_dominated_nodes);
+        let mut dominated_nodes_set = find_all_dominated_nodes(dominator_tree, block_id);
+        dominated_nodes_set.insert(block_id);
 
-        let mut dominated_nodes: Vec<usize> = immediately_dominated_nodes.iter().copied().collect();
-        dominated_nodes.push(block_id);
-        dominated_nodes.sort();
-
-        let dominated_nodes_set = dominated_nodes.iter().copied().collect::<HashSet<usize>>();
+        let dominated_nodes: Vec<usize> = dominated_nodes_set.iter().copied().sorted().collect();
 
         // look through all the successors of dominated nodes, eliminating those that are also in dominated_nodes
         let mut all_successors_of_dominated: HashSet<usize> = HashSet::new();
@@ -289,7 +284,7 @@ impl<'a> ControlFlowGraph<'a> {
     }
 }
 
-pub fn retain_only_strict_dominators(dominators: Dominators) -> StrictDominators {
+pub fn retain_only_strict_dominators(dominators: &Dominators) -> StrictDominators {
     let block_ids = dominators.keys().copied().collect::<Vec<usize>>();
 
     let mut result: HashMap<usize, HashSet<usize>> = HashMap::new();
@@ -310,13 +305,34 @@ pub fn retain_only_strict_dominators(dominators: Dominators) -> StrictDominators
     result
 }
 
+fn find_all_dominated_nodes(dom_tree: &DominatorTree, block_id: usize) -> HashSet<usize> {
+    let mut dominated_node_ids = HashSet::new();
+
+    let mut open_set: VecDeque<usize> = VecDeque::new();
+    open_set.push_back(block_id);
+
+    let none_set = HashSet::new();
+    while !open_set.is_empty() {
+        let next_block_id = open_set.pop_front().unwrap();
+
+        let immediately_dominated_ids = dom_tree.0.get(&next_block_id).unwrap_or(&none_set);
+        dominated_node_ids.extend(immediately_dominated_ids.iter());
+
+        immediately_dominated_ids
+            .iter()
+            .for_each(|i| open_set.push_back(*i));
+    }
+
+    dominated_node_ids
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::{BTreeSet, HashMap, HashSet};
 
     use crate::{basicblock::FunctionBlocks, cfg::graph::retain_only_strict_dominators};
 
-    use super::{ControlFlowGraph, DominatorTree, ImmediateDominators};
+    use super::{ControlFlowGraph, ImmediateDominators};
 
     struct GraphEdges {
         successors: HashMap<usize, Vec<usize>>,
@@ -416,7 +432,7 @@ mod tests {
         let cfg = get_mock_cfg(&mut mock_blocks, edges);
 
         let dominators = cfg.find_dominators();
-        let strict_dominators = retain_only_strict_dominators(dominators);
+        let strict_dominators = retain_only_strict_dominators(&dominators);
         let expected: HashMap<usize, HashSet<usize>> = HashMap::from([
             (0, HashSet::from([])),
             (1, HashSet::from([0])),
@@ -438,7 +454,7 @@ mod tests {
 
         let dominators = cfg.find_dominators();
         let immediate_dominators =
-            cfg.find_immediate_dominators(&retain_only_strict_dominators(dominators));
+            cfg.find_immediate_dominators(&retain_only_strict_dominators(&dominators));
 
         let expected: ImmediateDominators = HashMap::from([(1, 0), (2, 1), (3, 1), (4, 2), (5, 2)]);
 
@@ -453,15 +469,15 @@ mod tests {
         let cfg = get_mock_cfg(&mut mock_blocks, edges);
 
         let dominators = cfg.find_dominators();
-        let dominator_tree = cfg.create_dominator_tree(dominators);
+        let dominator_tree = cfg.create_dominator_tree(&dominators);
 
-        let expected: DominatorTree = HashMap::from([
+        let expected = HashMap::from([
             (0, HashSet::from([1])),
             (1, HashSet::from([2, 3])),
             (2, HashSet::from([4, 5])),
         ]);
 
-        assert_eq!(dominator_tree, expected);
+        assert_eq!(dominator_tree.0, expected);
     }
 
     #[test]
@@ -472,12 +488,11 @@ mod tests {
         let cfg = get_mock_cfg(&mut mock_blocks, edges);
 
         let dominators = cfg.find_dominators();
-        let dominator_tree = cfg.create_dominator_tree(dominators);
+        let dominator_tree = cfg.create_dominator_tree(&dominators);
 
-        let expected: DominatorTree =
-            HashMap::from([(0, HashSet::from([1])), (1, HashSet::from([2, 3, 4, 5]))]);
+        let expected = HashMap::from([(0, HashSet::from([1])), (1, HashSet::from([2, 3, 4, 5]))]);
 
-        assert_eq!(dominator_tree, expected);
+        assert_eq!(dominator_tree.0, expected);
     }
 
     #[test]
@@ -488,7 +503,7 @@ mod tests {
         let cfg = get_mock_cfg(&mut mock_blocks, edges);
 
         let dominators = cfg.find_dominators();
-        let dominator_tree = cfg.create_dominator_tree(dominators);
+        let dominator_tree = cfg.create_dominator_tree(&dominators);
 
         // in this cfg, the root node has no frontier as it dominates all nodes in the graph
         assert_eq!(
