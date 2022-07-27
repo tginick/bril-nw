@@ -211,6 +211,15 @@ impl FunctionBlocks {
         Some(self.get_block_by_id(*id.unwrap()).unwrap())
     }
 
+    pub fn get_block_idx_by_name(&self, name: &str) -> Option<usize> {
+        let id = self.block_name_to_id.get(name);
+        if let None = id {
+            return None;
+        }
+
+        Some(*id.unwrap())
+    }
+
     pub fn get_mut_block_by_id(&mut self, id: usize) -> Option<&mut BasicBlock> {
         let idx = self.block_id_to_idx.get(&id);
         if let None = idx {
@@ -255,7 +264,6 @@ impl fmt::Display for FunctionBlocks {
         }
 
         for block in &self.blocks {
-            writeln!(f, "#{}", block.name.borrow())?;
             write!(f, "{}", block)?;
         }
 

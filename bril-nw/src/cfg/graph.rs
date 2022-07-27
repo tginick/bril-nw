@@ -3,9 +3,7 @@ use std::fmt;
 
 use itertools::Itertools;
 
-use crate::basicblock::{BasicBlock, FunctionBlocks};
-
-const BLOCK_NAME_PFX: &'static str = "block_";
+use crate::basicblock::FunctionBlocks;
 
 #[derive(Debug)]
 pub struct ControlFlowGraph<'a> {
@@ -41,7 +39,7 @@ impl fmt::Display for ControlFlowGraph<'_> {
 impl<'a> ControlFlowGraph<'a> {
     pub fn create_from_basic_blocks(function_blocks: &'a mut FunctionBlocks) -> Self {
         let blocks = function_blocks.get_blocks();
-        
+
         let mut predecessors: HashMap<usize, Vec<usize>> = HashMap::new();
         let mut successors: HashMap<usize, Vec<usize>> = HashMap::new();
         let mut all_block_ids: Vec<usize> = Vec::with_capacity(blocks.len());
@@ -59,12 +57,13 @@ impl<'a> ControlFlowGraph<'a> {
                     .get_jump_target()
                     .unwrap()
                     .iter()
-                    .map(|l| format!("{}{}", BLOCK_NAME_PFX, l))
+                    .map(|l| l.to_string())
                     .collect();
                 let mut target_idxs = Vec::new();
                 for target in targets {
-                    if identifiers.contains_key(&target) {
-                        target_idxs.push(*identifiers.get(&target).unwrap());
+                    let maybe_idx = function_blocks.get_block_idx_by_name(&target);
+                    if let Some(idx) = maybe_idx {
+                        target_idxs.push(idx);
                     } else {
                         // TODO: bad
                     }
@@ -309,35 +308,6 @@ pub fn retain_only_strict_dominators(dominators: Dominators) -> StrictDominators
     }
 
     result
-}
-
-fn identify_basic_blocks(blocks: &Vec<BasicBlock>) -> HashMap<String, usize> {
-    let mut identifiers = HashMap::new();
-    for i in 0..blocks.len() {
-        let cur_block = &blocks[i];
-        if cur_block.instrs.is_empty() {
-            continue;
-        }
-
-        if cur_block.instrs[0].is_label() {
-            let block_name = format!(
-                "{}{}",
-                BLOCK_NAME_PFX,
-                cur_block.instrs[0].get_label().unwrap().to_string()
-            );
-
-            cur_block.set_name(&block_name);
-
-            identifiers.insert(block_name, i);
-        } else {
-            let block_name = format!("{}{}", BLOCK_NAME_PFX, identifiers.len());
-            cur_block.set_name(&block_name);
-
-            identifiers.insert(block_name, i);
-        }
-    }
-
-    identifiers
 }
 
 #[cfg(test)]
