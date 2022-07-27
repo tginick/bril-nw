@@ -46,7 +46,7 @@ pub enum OpCode {
     Phi,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ConstInstruction {
     pub op: OpCode,
     pub dest: String,
@@ -54,7 +54,7 @@ pub struct ConstInstruction {
     pub value: Value,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ValueInstruction {
     pub op: OpCode,
     pub dest: String,
@@ -64,7 +64,7 @@ pub struct ValueInstruction {
     pub labels: Vec<String>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 
 pub struct EffectInstruction {
     pub op: OpCode,
@@ -73,7 +73,7 @@ pub struct EffectInstruction {
     pub labels: Vec<String>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Instruction {
     Const(ConstInstruction),
     Value(ValueInstruction),

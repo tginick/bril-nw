@@ -20,7 +20,7 @@ lazy_static! {
 
 const BLOCK_NAME_PFX: &'static str = "block_";
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct BasicBlock {
     id: usize,
     name: RefCell<String>,

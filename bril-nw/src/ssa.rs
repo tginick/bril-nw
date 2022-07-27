@@ -211,13 +211,15 @@ impl<'a> SSABuilder<'a> {
                     old_dest.to_string(),
                 );
 
-                let new_dest = arg_name_stack.create_new_name(old_dest);
+                if self.all_vars.get(old_dest).map_or(0, |h| h.len()) > 1 {
+                    let new_dest = arg_name_stack.create_new_name(old_dest);
 
-                let num_names_created_for_var =
-                    num_names_created.entry(old_dest.to_string()).or_insert(0);
-                *num_names_created_for_var += 1;
+                    let num_names_created_for_var =
+                        num_names_created.entry(old_dest.to_string()).or_insert(0);
+                    *num_names_created_for_var += 1;
 
-                new_instr.set_dest(new_dest);
+                    new_instr.set_dest(new_dest);
+                }
             }
 
             *instr = Rc::new(new_instr);
@@ -348,9 +350,8 @@ mod tests {
         fs::read_to_string(p).unwrap()
     }
 
-    #[test]
-    fn test_if() {
-        let contents = load_bril_from_test_dir("if_orig.json");
+    fn run_bril_ssa_comparison(test_file: &str, expected_file: &str) {
+        let contents = load_bril_from_test_dir(test_file);
 
         let program = load_bril(&contents).unwrap();
         let main_func = program.functions[0].clone();
@@ -360,14 +361,31 @@ mod tests {
         assert!(maybe_blocks.is_ok());
 
         let mut blocks = maybe_blocks.unwrap();
-        let mut cfg = ControlFlowGraph::create_from_basic_blocks(&mut blocks);
-        let dominators = cfg.find_dominators();
-        let dom_tree = cfg.create_dominator_tree(&dominators);
+        {
+            let mut cfg = ControlFlowGraph::create_from_basic_blocks(&mut blocks);
+            let dominators = cfg.find_dominators();
+            let dom_tree = cfg.create_dominator_tree(&dominators);
 
-        super::convert_to_ssa_form(&mut cfg, &dom_tree);
+            super::convert_to_ssa_form(&mut cfg, &dom_tree);
+        }
 
-        println!("{}", blocks);
+        let expected_contents = load_bril_from_test_dir(expected_file);
+        let expected_program = load_bril(&expected_contents).unwrap();
+        let expected_main_func = expected_program.functions[0].clone();
 
-        todo!();
+        let expected_loader = FunctionBlocksLoader::new(expected_main_func);
+        let expected_blocks = expected_loader.load().unwrap();
+
+        assert_eq!(blocks.get_blocks(), expected_blocks.get_blocks());
+    }
+
+    #[test]
+    fn test_if() {
+        run_bril_ssa_comparison("if_orig.json", "if_ssa.json");
+    }
+
+    #[test]
+    fn test_loop() {
+        run_bril_ssa_comparison("loop_orig.json", "loop_ssa.json");
     }
 }
