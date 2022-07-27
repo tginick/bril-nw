@@ -45,7 +45,14 @@ fn main() {
     let loaded_bril = loaded_bril.unwrap();
 
     for func in loaded_bril.functions {
-        let mut bb = basicblock::load_function_blocks(func.clone());
+        let loader = basicblock::FunctionBlocksLoader::new(func.clone());
+        let maybe_bb = loader.load();
+        if let Err(errs) = maybe_bb {
+            println!("Errors occurred loading function: {}", errs.join("\n"));
+            continue;
+        }
+
+        let mut bb = maybe_bb.unwrap();
 
         let mut cfg = cfg::ControlFlowGraph::create_from_basic_blocks(&mut bb);
         if cmd_line.display_cfg {

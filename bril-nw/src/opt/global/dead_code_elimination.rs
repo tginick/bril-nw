@@ -96,7 +96,7 @@ mod tests {
 
         let bb = BasicBlock::new(0, instrs);
 
-        let mut f = FunctionBlocks::new("test", vec![], vec![bb], HashMap::new());
+        let mut f = FunctionBlocks::new("test", vec![], vec![bb], HashMap::new(), HashMap::new());
 
         let mut dce = DeadCodeElimination();
         dce.run(&mut f);

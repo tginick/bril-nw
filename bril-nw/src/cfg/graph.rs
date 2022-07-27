@@ -40,8 +40,8 @@ impl fmt::Display for ControlFlowGraph<'_> {
 
 impl<'a> ControlFlowGraph<'a> {
     pub fn create_from_basic_blocks(function_blocks: &'a mut FunctionBlocks) -> Self {
-        let blocks = &function_blocks.get_blocks();
-        let identifiers = identify_basic_blocks(&blocks);
+        let blocks = function_blocks.get_blocks();
+        
         let mut predecessors: HashMap<usize, Vec<usize>> = HashMap::new();
         let mut successors: HashMap<usize, Vec<usize>> = HashMap::new();
         let mut all_block_ids: Vec<usize> = Vec::with_capacity(blocks.len());
@@ -403,7 +403,7 @@ mod tests {
     }
 
     fn get_mock_function_blocks() -> FunctionBlocks {
-        FunctionBlocks::new("", vec![], vec![], HashMap::new())
+        FunctionBlocks::new("", vec![], vec![], HashMap::new(), HashMap::new())
     }
 
     fn get_mock_cfg<'a>(

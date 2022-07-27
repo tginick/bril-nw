@@ -18,6 +18,8 @@ lazy_static! {
     };
 }
 
+const BLOCK_NAME_PFX: &'static str = "block_";
+
 #[derive(Debug)]
 pub struct BasicBlock {
     id: usize,
@@ -31,6 +33,7 @@ pub struct FunctionBlocks {
     args: Vec<Rc<FunctionArg>>,
     blocks: Vec<BasicBlock>,
     block_id_to_idx: HashMap<usize, usize>,
+    block_name_to_id: HashMap<String, usize>,
 }
 
 impl BasicBlock {
@@ -55,69 +58,115 @@ impl BasicBlock {
     }
 }
 
-pub fn load_function_blocks(function: Rc<Function>) -> FunctionBlocks {
-    let mut blocks: Vec<BasicBlock> = Vec::new();
-    let mut block_id_to_idx: HashMap<usize, usize> = HashMap::new();
+pub struct FunctionBlocksLoader {
+    function: Rc<Function>,
+    cur_id: usize,
+    block_id_to_idx: HashMap<usize, usize>,
+    block_name_to_id: HashMap<String, usize>,
 
-    let mut cur_id: usize = 0;
+    already_used_labels: HashSet<String>,
 
-    let mut cur_block_instrs: Vec<Rc<Instruction>> = Vec::new();
-    for instr in &function.instrs {
-        if instr.is_instr() {
-            cur_block_instrs.push(instr.clone());
+    blocks: Vec<BasicBlock>,
+    pub load_errors: Vec<String>,
+}
 
-            if TERMINATOR_INSTS.contains(&instr.get_op_code().unwrap()) {
-                add_block(
-                    &mut blocks,
-                    &mut block_id_to_idx,
-                    cur_id,
-                    cur_block_instrs.clone(),
-                );
-
-                cur_id += 1;
-                cur_block_instrs.clear();
-            }
-        } else if instr.is_label() {
-            if !cur_block_instrs.is_empty() {
-                add_block(
-                    &mut blocks,
-                    &mut block_id_to_idx,
-                    cur_id,
-                    cur_block_instrs.clone(),
-                );
-
-                cur_id += 1;
-                cur_block_instrs.clear();
-            }
-
-            // the label will go in the beginning of the next basicblock
-            cur_block_instrs.push(instr.clone());
+impl FunctionBlocksLoader {
+    pub fn new(function: Rc<Function>) -> Self {
+        FunctionBlocksLoader {
+            function,
+            cur_id: 0,
+            block_id_to_idx: HashMap::new(),
+            block_name_to_id: HashMap::new(),
+            already_used_labels: HashSet::new(),
+            blocks: Vec::new(),
+            load_errors: Vec::new(),
         }
     }
 
-    // yield the final basic block
-    if !cur_block_instrs.is_empty() {
-        add_block(&mut blocks, &mut block_id_to_idx, cur_id, cur_block_instrs);
+    pub fn load(mut self) -> Result<FunctionBlocks, Vec<String>> {
+        let mut cur_block_instrs: Vec<Rc<Instruction>> = Vec::new();
+        let function = self.function.clone();
+
+        for instr in &function.instrs {
+            if instr.is_instr() {
+                cur_block_instrs.push(instr.clone());
+
+                if TERMINATOR_INSTS.contains(&instr.get_op_code().unwrap()) {
+                    self.add_block(&mut cur_block_instrs);
+                }
+            } else if instr.is_label() {
+                if !cur_block_instrs.is_empty() {
+                    self.add_block(&mut cur_block_instrs);
+                }
+
+                // the label will go in the beginning of the next basicblock
+                cur_block_instrs.push(instr.clone());
+            }
+        }
+
+        if !cur_block_instrs.is_empty() {
+            self.add_block(&mut cur_block_instrs);
+        }
+
+        if !self.load_errors.is_empty() {
+            return Err(self.load_errors);
+        }
+
+        Ok(FunctionBlocks::new(
+            &self.function.name,
+            self.function.args.clone(),
+            self.blocks,
+            self.block_id_to_idx,
+            self.block_name_to_id,
+        ))
     }
 
-    FunctionBlocks::new(
-        &function.name,
-        function.args.clone(),
-        blocks,
-        block_id_to_idx,
-    )
-}
+    fn add_block(&mut self, cur_block_instrs: &mut Vec<Rc<Instruction>>) {
+        let next_idx = self.blocks.len();
+        let new_id = self.cur_id;
+        self.cur_id += 1;
 
-fn add_block(
-    blocks: &mut Vec<BasicBlock>,
-    block_id_to_idx: &mut HashMap<usize, usize>,
-    new_id: usize,
-    instrs: Vec<Rc<Instruction>>,
-) {
-    let next_idx = blocks.len();
-    block_id_to_idx.insert(new_id, next_idx);
+        self.block_id_to_idx.insert(new_id, next_idx);
 
-    blocks.push(BasicBlock::new(new_id, instrs));
+        // assign the block's name. if the first elem is a label, then that is it's name
+        // otherwise we make one up
+        let block_name = if !cur_block_instrs.is_empty() && cur_block_instrs[0].is_label() {
+            let block_name = cur_block_instrs[0].get_label().unwrap().to_string();
+
+            if self.already_used_labels.contains(&block_name) {
+                self.load_errors.push(format!(
+                    "Label {} has been used multiple times",
+                    &block_name
+                ));
+            }
+
+            self.already_used_labels.insert(block_name.clone());
+
+            block_name
+        } else {
+            // there's no label in this basic block. add one
+            let new_block_name = format!("{}{}", BLOCK_NAME_PFX, new_id);
+
+            if self.already_used_labels.contains(&new_block_name) {
+                self.load_errors.push(format!(
+                    "Label {} has been used multiple times",
+                    &new_block_name
+                ));
+            }
+
+            self.already_used_labels.insert(new_block_name.clone());
+
+            new_block_name
+        };
+
+        let newbb = BasicBlock::new(new_id, cur_block_instrs.clone());
+        newbb.set_name(&block_name);
+
+        self.block_name_to_id.insert(block_name, new_id);
+
+        self.blocks.push(newbb);
+        cur_block_instrs.clear();
+    }
 }
 
 impl FunctionBlocks {
@@ -126,12 +175,14 @@ impl FunctionBlocks {
         args: Vec<Rc<FunctionArg>>,
         blocks: Vec<BasicBlock>,
         block_id_to_idx: HashMap<usize, usize>,
+        block_name_to_id: HashMap<String, usize>,
     ) -> Self {
         FunctionBlocks {
             name: name.to_string(),
             args,
             blocks,
             block_id_to_idx,
+            block_name_to_id,
         }
     }
     pub fn get_blocks(&self) -> &Vec<BasicBlock> {
@@ -149,6 +200,15 @@ impl FunctionBlocks {
         }
 
         Some(&self.blocks[*idx.unwrap()])
+    }
+
+    pub fn get_block_by_name(&self, name: &str) -> Option<&BasicBlock> {
+        let id = self.block_name_to_id.get(name);
+        if let None = id {
+            return None;
+        }
+
+        Some(self.get_block_by_id(*id.unwrap()).unwrap())
     }
 
     pub fn get_mut_block_by_id(&mut self, id: usize) -> Option<&mut BasicBlock> {

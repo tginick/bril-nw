@@ -343,7 +343,7 @@ mod tests {
         path::{Path, PathBuf},
     };
 
-    use crate::{basicblock::load_function_blocks, bril::loader::load_bril, cfg::ControlFlowGraph};
+    use crate::{basicblock::FunctionBlocksLoader, bril::loader::load_bril, cfg::ControlFlowGraph};
 
     fn load_bril_from_test_dir(json_file: &str) -> String {
         let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -361,7 +361,11 @@ mod tests {
         let program = load_bril(&contents).unwrap();
         let main_func = program.functions[0].clone();
 
-        let mut blocks = load_function_blocks(main_func);
+        let loader = FunctionBlocksLoader::new(main_func);
+        let maybe_blocks = loader.load();
+        assert!(maybe_blocks.is_ok());
+
+        let mut blocks = maybe_blocks.unwrap();
         let mut cfg = ControlFlowGraph::create_from_basic_blocks(&mut blocks);
         let dom_tree = cfg.create_dominator_tree(cfg.find_dominators());
 
