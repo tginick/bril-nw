@@ -176,18 +176,22 @@ impl FunctionBlocks {
 impl fmt::Display for FunctionBlocks {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "@{}(", self.get_name())?;
-        for (i, arg) in self.args.iter().enumerate() {
-            write!(
-                f,
-                "{}: {}{}",
-                &arg.name,
-                arg.arg_type,
-                if i < self.args.len() - 1 {
-                    ", "
-                } else {
-                    ") {\n"
-                }
-            )?;
+        if !self.args.is_empty() {
+            for (i, arg) in self.args.iter().enumerate() {
+                write!(
+                    f,
+                    "{}: {}{}",
+                    &arg.name,
+                    arg.arg_type,
+                    if i < self.args.len() - 1 {
+                        ", "
+                    } else {
+                        ") {\n"
+                    }
+                )?;
+            }
+        } else {
+            write!(f, ") {{\n")?;
         }
 
         for block in &self.blocks {

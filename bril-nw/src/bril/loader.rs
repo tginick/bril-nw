@@ -5,8 +5,13 @@ use json::JsonValue;
 use super::types::{Function, FunctionArg, Instruction, OpCode, Program, Type, Value};
 
 lazy_static! {
-    static ref VALUE_INSTS: HashSet<OpCode> =
-        HashSet::from([OpCode::Id, OpCode::Add, OpCode::Mul, OpCode::Phi]);
+    static ref VALUE_INSTS: HashSet<OpCode> = HashSet::from([
+        OpCode::Id,
+        OpCode::Add,
+        OpCode::Mul,
+        OpCode::LessThan,
+        OpCode::Phi
+    ]);
     static ref EFFECT_INSTS: HashSet<OpCode> =
         HashSet::from([OpCode::Print, OpCode::Ret, OpCode::Branch, OpCode::Jump]);
     static ref CONST_INSTS: HashSet<OpCode> = HashSet::from([OpCode::Const]);
@@ -135,7 +140,7 @@ fn load_bril_instr(instr_v: &JsonValue) -> Result<Rc<Instruction>, BrilLoadError
 
     let real_op: Result<OpCode, ()> = op_str.try_into();
     if let Err(_) = real_op {
-        return Err(BrilLoadError::MalformedInstr);
+        return Err(BrilLoadError::UnrecognizedInstr(op_str.to_string()));
     }
 
     let real_op = real_op.unwrap();
