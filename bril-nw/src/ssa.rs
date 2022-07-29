@@ -76,7 +76,7 @@ impl<'a> SSABuilder<'a> {
         ssa_builder
     }
 
-    pub fn convert_to_ssa_form(&mut self) {
+    pub fn convert_to_ssa_form(mut self) {
         self.insert_phi_nodes();
         self.rename_vars();
         self.finalize_phi_nodes();
@@ -319,7 +319,7 @@ impl<'a> SSABuilder<'a> {
 }
 
 pub fn convert_to_ssa_form<'a>(cfg: &'a mut ControlFlowGraph<'a>, dom_tree: &'a DominatorTree) {
-    let mut ssa_builder = SSABuilder::new(cfg, dom_tree);
+    let ssa_builder = SSABuilder::new(cfg, dom_tree);
     ssa_builder.convert_to_ssa_form();
 }
 
